@@ -11,6 +11,8 @@ export default async function handler(req, res){
       process.env.SUPABASE_SERVICE_ROLE
     )
 
+
+    
     const empresas = [
       { id:"VAREJO_URL_DELICIA", nome:"DELÍCIA" },
       { id:"VAREJO_URL_VILLA", nome:"VILLA" },
