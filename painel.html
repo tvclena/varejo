@@ -510,6 +510,8 @@ load(t.inicio,t.fim)
 
 // ================= TEMPO REAL VIA API =================
 
+const TOKENS = {}
+
 async function buscarTempoReal(){
 
   const hoje = new Date()
@@ -533,33 +535,46 @@ async function buscarTempoReal(){
 
     try{
 
-// 🔥 PEGA TOKEN AUTOMATICAMENTE
-const login = await fetch("/api/login",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({ empresa: emp })
-})
+      // 🔥 1. GARANTE TOKEN
+      if(!TOKENS[emp]){
 
-const loginJson = await login.json()
-const token = loginJson.accessToken || loginJson.token
+        console.log("🔑 Gerando token:", emp)
 
-// 🔥 AGORA SIM FUNCIONA
-const resp = await fetch("/api/recebimentos",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({
-    token, // 🔥 ESSA LINHA RESOLVE
-    empresa: emp,
-    dataInicio: toDateOnly(hoje),
-    dataFim: toDateOnly(hoje)
-  })
-})
+        const login = await fetch("/api/login",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ empresa: emp })
+        })
 
+        const loginJson = await login.json()
 
+        if(!loginJson.accessToken && !loginJson.token){
+          console.log("❌ ERRO LOGIN:", emp, loginJson)
+          continue
+        }
 
+        TOKENS[emp] = loginJson.accessToken || loginJson.token
+      }
 
+      const token = TOKENS[emp]
 
-      
+      // 🔥 2. CHAMA API CORRETAMENTE
+      const resp = await fetch("/api/recebimentos",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          token, // 🔥 ESSENCIAL
+          empresa: emp,
+          dataInicio: toDateOnly(hoje),
+          dataFim: toDateOnly(hoje)
+        })
+      })
+
+      if(!resp.ok){
+        const erro = await resp.text()
+        console.log("❌ ERRO API:", emp, erro)
+        continue
+      }
 
       const json = await resp.json()
 
@@ -577,7 +592,6 @@ const resp = await fetch("/api/recebimentos",{
 
   return all
 }
-
 
 
   setInterval(async ()=>{
