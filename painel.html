@@ -406,7 +406,8 @@ const fimISO = toLocalISO(fim)
     const { data, error } = await sb
       .from("cupons_importados")
       .select("empresa_id,data,raw") // 🔥 NÃO USA *
-      .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
+      .gte("data", inicioISO.slice(0,10))
+      .lte("data", fimISO.slice(0,10))
       .lt("data", new Date(fim.getTime() + 1000).toISOString())
       .range(from, from + step - 1)
 
