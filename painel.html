@@ -389,49 +389,67 @@ function renderChart(d){
 // ================= LOAD =================
 async function load(inicio, fim){
 
-  let all = []
-  let from = 0
-  const step = 300
+  const status = document.getElementById("status")
+  status.innerHTML = "🔄 carregando..."
 
-  // 🔥 CONVERTE PARA YYYY-MM-DD (CORRETO PRO SUPABASE)
-  function toDateOnly(date){
-    const d = new Date(date)
-    return d.getFullYear() + "-" +
-      String(d.getMonth()+1).padStart(2,"0") + "-" +
-      String(d.getDate()).padStart(2,"0")
-  }
+  try{
 
-  const inicioISO = toDateOnly(inicio)
-  const fimISO = toDateOnly(fim)
+    const inicioISO = inicio.toISOString().slice(0,10)
+    const fimISO = fim.toISOString().slice(0,10)
 
-  console.log("📅 FILTRO BANCO:", inicioISO, "→", fimISO)
+    console.log("📅 BUSCA:", inicioISO, fimISO)
 
-  // ================= PAGINAÇÃO =================
-  while(true){
-
+    // 🔥 BUSCA DIRETO AGRUPADO
     const { data, error } = await sb
       .from("cupons_importados")
-      .select("empresa_id,data,raw")
+      .select("empresa_id, valor_total, cancelado")
       .gte("data", inicioISO)
       .lte("data", fimISO)
-      .range(from, from + step - 1)
 
     if(error){
-      console.error("❌ ERRO SUPABASE:", error)
-      break
+      console.log("❌ ERRO:", error)
+      return
     }
 
-    if(!data || data.length === 0) break
+    console.log("📦 TOTAL REGISTROS:", data.length)
 
-    all = all.concat(data)
+    // 🔥 PROCESSAMENTO LEVE (SEM RAW)
+    const result = {}
 
-    if(data.length < step) break
+    data.forEach(c=>{
 
-    from += step
+      const emp = c.empresa_id
+
+      if(!result[emp]){
+        result[emp] = {
+          total:0,
+          vendas:0,
+          cancelados:0,
+          valorCancelado:0
+        }
+      }
+
+      if(c.cancelado){
+        result[emp].cancelados++
+        result[emp].valorCancelado += Number(c.valor_total || 0)
+      }else{
+        result[emp].total += Number(c.valor_total || 0)
+        result[emp].vendas++
+      }
+
+    })
+
+    render(result)
+
+    status.innerHTML = "🟢 atualizado"
+
+  }catch(e){
+    console.log("❌ ERRO LOAD:", e)
+    status.innerHTML = "🔴 erro"
   }
+}
 
-  console.log("📊 TOTAL CARREGADO:", all.length)
-
+  
   // ================= PROCESS =================
 
   function parseLocal(dateStr){
@@ -501,6 +519,26 @@ document.getElementById("fim").value = formatLocal(t.fim)
 
 load(t.inicio,t.fim)
 
+// 🔥 REALTIME SUPABASE (COLOCAR AQUI)
+sb.channel("realtime_vendas")
+.on("postgres_changes",{
+  event:"INSERT",
+  schema:"public",
+  table:"cupons_importados"
+},(payload)=>{
+
+  console.log("⚡ NOVA VENDA:", payload.new)
+
+  const t = turno()
+  load(t.inicio, t.fim)
+
+})
+.subscribe((s)=>{
+  console.log("📡 REALTIME:", s)
+})
+
+
+  
 // ================= REALTIME =================
 sb.channel("rt")
 .on("postgres_changes",{
