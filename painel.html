@@ -392,16 +392,26 @@ async function load(inicio, fim){
   let from = 0
   const step = 300
 
-  // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
-  const inicioISO = inicio.toISOString()
-  const fimISO = fim.toISOString()
+  // 🔥 CONVERTE PARA YYYY-MM-DD (CORRETO PRO SUPABASE)
+  function toDateOnly(date){
+    const d = new Date(date)
+    return d.getFullYear() + "-" +
+      String(d.getMonth()+1).padStart(2,"0") + "-" +
+      String(d.getDate()).padStart(2,"0")
+  }
 
+  const inicioISO = toDateOnly(inicio)
+  const fimISO = toDateOnly(fim)
+
+  console.log("📅 FILTRO BANCO:", inicioISO, "→", fimISO)
+
+  // ================= PAGINAÇÃO =================
   while(true){
 
     const { data, error } = await sb
       .from("cupons_importados")
-      .select("empresa_id,data,raw") // 🔥 NÃO USA *
-      .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
+      .select("empresa_id,data,raw")
+      .gte("data", inicioISO)
       .lte("data", fimISO)
       .range(from, from + step - 1)
 
@@ -421,7 +431,40 @@ async function load(inicio, fim){
 
   console.log("📊 TOTAL CARREGADO:", all.length)
 
-  const dados = process(all, inicio, fim)
+  // ================= PROCESS =================
+
+  function parseLocal(dateStr){
+    // 🔥 REMOVE UTC BUG
+    return new Date(dateStr.replace("Z",""))
+  }
+
+  const dados = process(
+    all.map(v=>{
+      const raw = lerJSONSeguro(v.raw)
+
+      if(!raw) return null
+
+      let dataHora = raw?.dataHoraFechamentoCupom
+
+      if(!dataHora && raw?.data && raw?.hora){
+        const h = raw.hora.padStart(4,"0")
+        dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
+      }
+
+      if(!dataHora && raw?.data){
+        dataHora = raw.data + "T00:00:00"
+      }
+
+      return {
+        ...v,
+        __dataCorrigida: parseLocal(dataHora)
+      }
+
+    }).filter(Boolean),
+
+    inicio,
+    fim
+  )
 
   render(dados)
 
