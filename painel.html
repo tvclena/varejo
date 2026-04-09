@@ -391,6 +391,8 @@ function renderChart(d){
 // ================= LOAD =================
 async function load(inicio, fim){
 
+  const hoje = new Date().toISOString().slice(0,10)
+
   let all = []
   let from = 0
   const step = 1000
@@ -400,10 +402,11 @@ async function load(inicio, fim){
     const { data, error } = await sb
       .from("cupons_importados")
       .select("empresa_id,data,valor_total,cancelado,raw")
+      .eq("data", hoje) // 🔥 FILTRO CORRETO
       .range(from, from + step - 1)
 
     if(error){
-      console.error("❌ ERRO:", error)
+      console.error("❌ ERRO SUPABASE:", error)
       break
     }
 
@@ -416,11 +419,11 @@ async function load(inicio, fim){
     from += step
   }
 
-  console.log("🔥 TOTAL BRUTO:", all.length)
+  console.log("🔥 TOTAL CARREGADO:", all.length)
 
   const dados = process(all, inicio, fim)
 
-  console.log("🔥 TOTAL FILTRADO:",
+  console.log("🔥 TOTAL FINAL:",
     Object.values(dados).reduce((a,b)=>a+b.total,0)
   )
 
