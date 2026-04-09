@@ -4,5 +4,13 @@
       "path": "/api/sync-vendas",
       "schedule": "*/1 * * * *"
     }
-  ]
+]
 }
+
+
+
+
+
+
+
+
