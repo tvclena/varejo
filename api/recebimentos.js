@@ -1,90 +1,162 @@
-// /api/recebimentos.js
 export default async function handler(req, res) {
+
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  console.log("🚀 RECEBIMENTOS START")
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+  const startTime = Date.now()
+
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido" });
+    console.log("⛔ Método inválido:", req.method)
+    return res.status(405).json({ error: "Método não permitido" })
   }
 
   try {
-    const { token, dataInicio, dataFim, empresa } = req.body;
 
+    const { token, dataInicio, dataFim, empresa } = req.body
+
+    console.log("📥 BODY:", req.body)
+
+    // ================= VALIDAÇÕES =================
     if (!token) {
-      return res.status(400).json({ error: "Token de autenticação ausente" });
+      console.log("⛔ Token ausente")
+      return res.status(400).json({ error: "Token de autenticação ausente" })
     }
 
     if (!empresa) {
-      return res.status(400).json({ error: "Empresa não informada" });
+      console.log("⛔ Empresa ausente")
+      return res.status(400).json({ error: "Empresa não informada" })
     }
 
-    // 🔹 Mapeamento das bases específicas por empresa
+    if (!dataInicio || !dataFim) {
+      console.log("⛔ Datas inválidas")
+      return res.status(400).json({ error: "Data início/fim obrigatória" })
+    }
+
+    // ================= MAPA DE EMPRESAS =================
     const urls = {
       VAREJO_URL_MERCATTO: "https://mercatto.varejofacil.com/api/v1/venda/cupons-fiscais",
       VAREJO_URL_VILLA: "https://deliciagourmet.varejofacil.com/api/v1/venda/cupons-fiscais",
       VAREJO_URL_PADARIA: "https://mercattodelicia.varejofacil.com/api/v1/venda/cupons-fiscais",
       VAREJO_URL_DELICIA: "https://villachopp.varejofacil.com/api/v1/venda/cupons-fiscais"
-    };
-
-    const baseURL = urls[empresa];
-    if (!baseURL) {
-      return res.status(400).json({ error: `Empresa '${empresa}' não reconhecida.` });
     }
 
-    // 🔧 Formata apenas as datas (sem hora)
-    const inicioFormatado = dataInicio;
-    const fimFormatado = dataFim;
+    const baseURL = urls[empresa]
 
-    console.log("🔍 Consulta de cupons");
-    console.log("Empresa:", empresa);
-    console.log("Período:", inicioFormatado, "→", fimFormatado);
+    if (!baseURL) {
+      console.log("⛔ Empresa inválida:", empresa)
+      return res.status(400).json({ error: `Empresa '${empresa}' não reconhecida.` })
+    }
 
-    const count = 500;
-    let start = 0;
-    let allItems = [];
+    console.log("🏢 Empresa:", empresa)
+    console.log("📅 Período:", dataInicio, "→", dataFim)
 
-    // 🔄 Paginação
+    // ================= CONFIG =================
+    const count = 500
+    let start = 0
+    let pagina = 1
+    let totalGeral = 0
+    let allItems = []
+
+    // ================= LOOP PAGINAÇÃO =================
     while (true) {
-      const url = `${baseURL}?start=${start}&count=${count}&q=dataVenda=ge=${inicioFormatado};dataVenda=le=${fimFormatado}`;
-      console.log(`📡 Buscando página: ${url}`);
+
+      const url = `${baseURL}?start=${start}&count=${count}&q=dataVenda=ge=${dataInicio};dataVenda=le=${dataFim}`
+
+      console.log(`\n📡 Página ${pagina}`)
+      console.log(`➡️ Start: ${start}`)
+      console.log(`➡️ URL: ${url}`)
+
+      const t0 = Date.now()
 
       const response = await fetch(url, {
         headers: {
           Authorization: token,
           Accept: "application/json"
         }
-      });
+      })
+
+      const tempoReq = ((Date.now() - t0) / 1000).toFixed(2)
+
+      console.log(`⏱ Tempo requisição: ${tempoReq}s`)
 
       if (!response.ok) {
-        const erro = await response.text();
-        console.error(`❌ Erro na API (${empresa}):`, erro);
-        return res.status(response.status).json({ error: erro });
+        const erro = await response.text()
+        console.error("❌ ERRO API:", erro)
+
+        return res.status(response.status).json({
+          ok:false,
+          error: erro,
+          empresa,
+          pagina
+        })
       }
 
-      const json = await response.json();
+      const json = await response.json()
 
-      if (!json.items || json.items.length === 0) {
-        console.log("📭 Nenhum resultado encontrado nesta página.");
-        break;
+      const items = json.items || []
+
+      console.log(`📦 Itens recebidos: ${items.length}`)
+
+      // 🔴 Se não veio nada → acabou
+      if (items.length === 0) {
+        console.log("📭 Fim da paginação")
+        break
       }
 
-      allItems = allItems.concat(json.items);
-      start += count;
+      // 🔥 ACUMULA
+      allItems.push(...items)
+      totalGeral += items.length
 
-      if (json.items.length < count) break;
-      if (start > 5000) break; // segurança
+      console.log(`📊 Total acumulado: ${totalGeral}`)
+
+      // 🔴 Se veio menos que 500 → acabou
+      if (items.length < count) {
+        console.log("✅ Última página detectada")
+        break
+      }
+
+      // 🔥 Próxima página
+      start += count
+      pagina++
+
+      // 🛑 Proteção contra loop infinito
+      if (pagina > 1000) {
+        console.log("⛔ LOOP BLOQUEADO (segurança)")
+        break
+      }
     }
 
-    console.log(`✅ Total de cupons retornados (${empresa}): ${allItems.length}`);
+    const tempoTotal = ((Date.now() - startTime) / 1000).toFixed(2)
 
-    res.status(200).json({
-      start: 0,
-      total: allItems.length,
+    console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    console.log("✅ FINALIZADO")
+    console.log("📊 Total cupons:", totalGeral)
+    console.log("📄 Total páginas:", pagina)
+    console.log("⏱ Tempo total:", tempoTotal, "s")
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    return res.status(200).json({
+      ok: true,
+      empresa,
+      periodo: { inicio: dataInicio, fim: dataFim },
+      total: totalGeral,
+      paginas: pagina,
+      tempo: tempoTotal,
       items: allItems
-    });
+    })
 
   } catch (error) {
-    console.error("❌ Erro no recebimentos.js:", error);
-    res.status(500).json({
-      error: "Falha ao consultar API de recebimentos",
+
+    console.error("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    console.error("💥 ERRO GERAL")
+    console.error(error)
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    return res.status(500).json({
+      ok:false,
+      error: "Falha ao consultar API",
       details: error.message
-    });
+    })
   }
 }
