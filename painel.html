@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -302,25 +303,11 @@ const d = v.__dataCorrigida || new Date(p.data)
     }
 
     // 🔴 CANCELADOS
-if(p.cancelado){
-
-  let valorCancelado = 0
-
-  p.finais.forEach(f=>{
-    const bruto = Number(f.valor || 0)
-    const troco = Number(f.troco || 0)
-    const valor = bruto - troco
-
-    if(valor > 0){
-      valorCancelado += valor
+    if(p.cancelado){
+      result[emp].cancelados++
+      result[emp].valorCancelado += p.valor
+      return
     }
-  })
-
-  result[emp].cancelados++
-  result[emp].valorCancelado += valorCancelado
-
-  return
-}
 
     // ✅ VÁLIDOS
 let totalCupom = 0
@@ -591,6 +578,21 @@ const resp = await fetch("/api/recebimentos",{
 
   return all
 }
+
+
+
+  setInterval(async ()=>{
+
+  console.log("🔄 TEMPO REAL...")
+
+  const novos = await buscarTempoReal()
+
+  const dados = process(novos, t.inicio, t.fim)
+
+  render(dados)
+
+}, 5000) // 5 segundos
+
 
 
 
