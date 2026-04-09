@@ -259,7 +259,7 @@ if(!raw) return null
 
 return {
   data: dataHora,
-  valor: Number(raw?.valor || 0),
+valor: 0, // NÃO USA MAIS
   finais: raw?.finalizacoes || [],
   cancelado: raw?.cancelada || raw?.cancelado || false
 }
