@@ -286,9 +286,7 @@ const id = v.id || raw?.id
 const p = parse(v)
 if(!p || !p.data) return
 
-    const d = new Date(p.data)
-
-
+const d = v.__dataCorrigida || new Date(p.data)
 
     
     if(d < inicio || d > fim) return
