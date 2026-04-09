@@ -533,33 +533,15 @@ async function buscarTempoReal(){
 
     try{
 
-// 🔥 PEGA TOKEN AUTOMATICAMENTE
-const login = await fetch("/api/login",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({ empresa: emp })
-})
-
-const loginJson = await login.json()
-const token = loginJson.accessToken || loginJson.token
-
-// 🔥 AGORA SIM FUNCIONA
-const resp = await fetch("/api/recebimentos",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({
-    token, // 🔥 ESSA LINHA RESOLVE
-    empresa: emp,
-    dataInicio: toDateOnly(hoje),
-    dataFim: toDateOnly(hoje)
-  })
-})
-
-
-
-
-
-      
+      const resp = await fetch("/api/recebimentos",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          empresa: emp,
+          dataInicio: toDateOnly(hoje),
+          dataFim: toDateOnly(hoje)
+        })
+      })
 
       const json = await resp.json()
 
