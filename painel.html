@@ -269,13 +269,26 @@ return {
 function process(data, inicio, fim){
 
   const result = {}
+  const seen = new Set()
 
   data.forEach(v=>{
 
-    // 🔥 DATA CORRETA (SEM FUSO BUGADO)
+    // 🔥 ID ÚNICO (evita duplicado)
+    const raw = lerJSONSeguro(v.raw)
+    const id = raw?.id
+
+    if(!id) return
+    if(seen.has(id)) return
+    seen.add(id)
+
+    // 🔥 DATA REAL (DATA DO CUPOM)
     const d = new Date(v.data + "T12:00:00")
 
-    if(d < inicio || d > fim) return
+    // 🔥 AJUSTE DE TURNO
+    const inicioTurno = new Date(inicio)
+    const fimTurno = new Date(fim)
+
+    if(d < inicioTurno || d > fimTurno) return
 
     const emp = v.empresa_id
 
@@ -289,31 +302,33 @@ function process(data, inicio, fim){
       }
     }
 
+    const valor = Number(v.valor_total || 0)
+
+    if(valor <= 0) return
+
     // 🔴 CANCELADOS
     if(v.cancelado){
       result[emp].cancelados++
-      result[emp].valorCancelado += Number(v.valor_total || v.valor || 0)
+      result[emp].valorCancelado += valor
       return
     }
 
-    // ✅ TOTAL REAL (OFICIAL DO CUPOM)
-    const totalCupom = Number(v.valor_total || v.valor || 0)
-
-    result[emp].total += totalCupom
+    // ✅ VÁLIDOS
+    result[emp].total += valor
     result[emp].vendas++
 
-    // 🔥 FINALIZADORAS (APENAS PARA VISUAL)
-    const raw = lerJSONSeguro(v.raw)
-
+    // 🔥 FINALIZADORAS (seguro)
     if(raw?.finalizacoes){
       raw.finalizacoes.forEach(f=>{
-        const valor = Number(f.valor || 0)
+        const val = Number(f.valor || 0)
+
+        if(val <= 0) return
 
         const idf = Number(f.finalizadoraId)
         const nome = MAPA[emp]?.[idf] || "OUTROS"
 
         result[emp].finais[nome] =
-          (result[emp].finais[nome] || 0) + valor
+          (result[emp].finais[nome] || 0) + val
       })
     }
 
@@ -380,44 +395,36 @@ async function load(inicio, fim){
   let from = 0
   const step = 1000
 
-  // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
-  const inicioISO = inicio.toISOString()
-  const fimISO = fim.toISOString()
-
   while(true){
 
     const { data, error } = await sb
       .from("cupons_importados")
-.select("empresa_id,data,valor,valor_total,cancelado,raw")
-      .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
-      .lte("data", fimISO)
+      .select("empresa_id,data,valor_total,cancelado,raw")
       .range(from, from + step - 1)
 
     if(error){
-      console.error("❌ ERRO SUPABASE:", error)
+      console.error("❌ ERRO:", error)
       break
     }
 
     if(!data || data.length === 0) break
 
-    all = all.concat(data)
+    all.push(...data)
 
     if(data.length < step) break
 
     from += step
   }
 
-  console.log("📊 TOTAL CARREGADO:", all.length)
+  console.log("🔥 TOTAL BRUTO:", all.length)
 
   const dados = process(all, inicio, fim)
 
+  console.log("🔥 TOTAL FILTRADO:",
+    Object.values(dados).reduce((a,b)=>a+b.total,0)
+  )
+
   render(dados)
-
-  document.getElementById("status").innerText =
-    "Atualizado " + new Date().toLocaleTimeString()
-
-  document.getElementById("periodo").innerText =
-    `Período: ${inicio.toLocaleString()} → ${fim.toLocaleString()}`
 }
 
 // ================= RELOAD =================
@@ -485,6 +492,11 @@ function lerJSONSeguro(raw){
     return null
   }
 }
+
+
+setInterval(()=>{
+  load(t.inicio, t.fim)
+}, 10000)
 </script>
 
 </body>
