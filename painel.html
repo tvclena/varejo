@@ -109,19 +109,7 @@ const sb = window.supabase.createClient(
 
 
 const STATUS_EMPRESAS = {}
-
-const EMPRESAS = [
-  "VAREJO_URL_MERCATTO",
-  "VAREJO_URL_VILLA",
-  "VAREJO_URL_PADARIA",
-  "VAREJO_URL_DELICIA"
-]
-
-EMPRESAS.forEach(emp=>{
-  STATUS_EMPRESAS[emp] = "yellow"
-})
-  
-  const ULTIMOS_DADOS = {}
+const ULTIMOS_DADOS = {}
 
 
 
@@ -384,15 +372,11 @@ function render(dados){
   const grid = document.getElementById("grid")
   grid.innerHTML=""
 
-  EMPRESAS.forEach(emp=>{
+  Object.keys(STATUS_EMPRESAS).forEach(emp=>{
 
-    const d = dados[emp] || ULTIMOS_DADOS[emp] || {
-      total:0,
-      vendas:0,
-      cancelados:0,
-      valorCancelado:0,
-      finais:{}
-    }
+    const d = dados[emp] || ULTIMOS_DADOS[emp]
+
+    if(!d) return
 
     const status = STATUS_EMPRESAS[emp] || "red"
 
@@ -414,6 +398,7 @@ function render(dados){
         </div>
 
         <div class="valor">${brl(d.total)}</div>
+
         <div>${d.vendas} vendas</div>
 
         <div style="color:red;font-size:12px">
@@ -436,10 +421,9 @@ function render(dados){
 let chart
 function renderChart(d){
 
-const base = {...ULTIMOS_DADOS, ...d}
+  const labels = Object.keys(d)
+  const values = labels.map(e=>d[e].total)
 
-const labels = Object.keys(base)
-const values = labels.map(e=>base[e]?.total || 0)
   if(chart) chart.destroy()
 
   chart = new Chart(grafico,{
@@ -660,23 +644,18 @@ async function buscarTempoReal(){
 
 setInterval(async ()=>{
 
-  try{
+  const novos = await buscarTempoReal()
 
-    const novos = await buscarTempoReal()
+  const dados = process(novos, t.inicio, t.fim)
 
-    const dados = process(novos, t.inicio, t.fim)
+  // mistura com antigos (não perde nada)
+  Object.keys(ULTIMOS_DADOS).forEach(emp=>{
+    if(!dados[emp]){
+      dados[emp] = ULTIMOS_DADOS[emp]
+    }
+  })
 
-    Object.keys(ULTIMOS_DADOS).forEach(emp=>{
-      if(!dados[emp]){
-        dados[emp] = ULTIMOS_DADOS[emp]
-      }
-    })
-
-    render(dados)
-
-  }catch(e){
-    console.log("❌ LOOP QUEBROU:", e.message)
-  }
+  render(dados)
 
 }, 5000)
 
