@@ -580,20 +580,20 @@ const resp = await fetch("/api/recebimentos",{
 
 
 
-// 🔥 atualização leve (só supabase)
-setInterval(()=>{
-  console.log("⚡ REFRESH LEVE (SUPABASE)")
-  const t = turno()
-  load(t.inicio, t.fim)
-}, 60000) // 1 minuto
+  setInterval(async ()=>{
 
-// 🔥 atualização pesada (API externa)
-setInterval(async ()=>{
-  console.log("🔄 REFRESH COMPLETO (API)")
+  console.log("🔄 TEMPO REAL...")
+
   const novos = await buscarTempoReal()
+
   const dados = process(novos, t.inicio, t.fim)
+
   render(dados)
-}, 600000) // 10 minutos
+
+}, 5000) // 5 segundos
+
+
+
 
 
 
