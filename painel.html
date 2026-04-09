@@ -277,8 +277,7 @@ const raw = lerJSONSeguro(v.raw)
 
 if(!raw) return null
 
-    const id = raw?.id
-
+const id = v.id || raw?.id
     // 🔥 BLOQUEIO DE DUPLICADOS
     if(!id) return
     if(seen.has(id)) return
@@ -288,8 +287,10 @@ const p = parse(v)
 if(!p || !p.data) return
 
     const d = new Date(p.data)
-    d.setHours(d.getHours() - 3)
 
+
+
+    
     if(d < inicio || d > fim) return
 
     const emp = v.empresa_id
