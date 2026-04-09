@@ -137,9 +137,10 @@ function parse(v){
   const raw = lerJSON(v.raw)
   if(!raw) return null
 
-  let dataHora = raw?.dataHoraFechamentoCupom
+  // 🔥 DATA CORRETA DO CUPOM
+  let dataHora = raw.dataHoraFechamentoCupom
 
-  if(!dataHora && raw?.data && raw?.hora){
+  if(!dataHora && raw.data && raw.hora){
     const h = raw.hora.padStart(4,"0")
     dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
   }
@@ -149,7 +150,7 @@ function parse(v){
   return {
     data,
     finais: raw.finalizacoes || [],
-    cancelado: raw.cancelada || false
+    cancelado: raw.cancelada === true
   }
 }
 
@@ -161,7 +162,13 @@ function process(lista, inicio, fim){
 
   lista.forEach(v=>{
 
-    const id = v.venda_id || v.unique_id
+    // 🔥 ID ÚNICO DO CUPOM
+    const raw = lerJSON(v.raw)
+    if(!raw) return
+
+    const id = raw.id || raw.idExterno
+    if(!id) return
+
     if(seen.has(id)) return
     seen.add(id)
 
@@ -170,31 +177,48 @@ function process(lista, inicio, fim){
 
     if(p.data < inicio || p.data > fim) return
 
-    const emp = v.empresa_id
+    const emp = v.empresa_id || "SEM_EMPRESA"
 
     if(!res[emp]){
-      res[emp]={total:0,vendas:0,cancelados:0,finais:{}}
+      res[emp]={
+        total:0,
+        vendas:0,
+        cancelados:0,
+        finais:{}
+      }
     }
 
+    // 🔴 CANCELADO
     if(p.cancelado){
       res[emp].cancelados++
       return
     }
 
     let totalCupom = 0
+    let tevePagamento = false
 
+    // 🔥 USA SOMENTE FINALIZACOES DO RAW
     p.finais.forEach(f=>{
-      const valor = (f.valor || 0) - (f.troco || 0)
-      if(valor <= 0) return
 
-      totalCupom += valor
+      const bruto = Number(f.valor || 0)
+      const troco = Number(f.troco || 0)
 
-      const nome = "FORMA " + f.finalizadoraId
+      const liquido = bruto - troco
+
+      if(liquido <= 0) return
+
+      tevePagamento = true
+      totalCupom += liquido
+
+      const idf = Number(f.finalizadoraId || 0)
+      const nome = "FINALIZADORA " + idf
+
       res[emp].finais[nome] =
-        (res[emp].finais[nome] || 0) + valor
+        (res[emp].finais[nome] || 0) + liquido
     })
 
-    if(totalCupom <= 0) return
+    // 🔥 IGUAL AO VAREJO → se não teve pagamento, ignora
+    if(!tevePagamento) return
 
     res[emp].total += totalCupom
     res[emp].vendas++
