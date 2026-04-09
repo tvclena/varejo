@@ -105,17 +105,6 @@ const sb = window.supabase.createClient(
   "sb_publishable_Jm2ZQKzPS3gNPCKSjFAmYQ_WNMYwF1j"
 )
 
-
-
-
-const STATUS_EMPRESAS = {}
-const ULTIMOS_DADOS = {}
-
-
-
-
-
-  
 // ================= MAPA ORIGINAL =================
 const MAPA_ORIGINAL = {
   VAREJO_URL_DELICIA: [
@@ -372,39 +361,18 @@ function render(dados){
   const grid = document.getElementById("grid")
   grid.innerHTML=""
 
-  Object.keys(STATUS_EMPRESAS).forEach(emp=>{
+  Object.keys(dados).forEach(emp=>{
 
-    const d = dados[emp] || ULTIMOS_DADOS[emp]
-
-    if(!d) return
-
-    const status = STATUS_EMPRESAS[emp] || "red"
-
-    const cor =
-      status === "green" ? "#22c55e" :
-      status === "yellow" ? "#f59e0b" :
-      "#ef4444"
+    const d = dados[emp]
 
     grid.innerHTML += `
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="empresa">${emp}</div>
-          <div style="
-            width:12px;
-            height:12px;
-            border-radius:50%;
-            background:${cor};
-          "></div>
-        </div>
-
+        <div class="empresa">${emp}</div>
         <div class="valor">${brl(d.total)}</div>
-
-        <div>${d.vendas} vendas</div>
-
-        <div style="color:red;font-size:12px">
-          ❌ ${d.cancelados} cancelados (${brl(d.valorCancelado)})
-        </div>
-
+<div>${d.vendas} vendas</div>
+<div style="color:red;font-size:12px">
+  ❌ ${d.cancelados} cancelados (${brl(d.valorCancelado)})
+</div>
         ${
           Object.entries(d.finais)
           .sort((a,b)=>b[1]-a[1])
@@ -417,6 +385,7 @@ function render(dados){
 
   renderChart(dados)
 }
+
 // ================= GRAFICO =================
 let chart
 function renderChart(d){
@@ -565,118 +534,63 @@ async function buscarTempoReal(){
       String(date.getDate()).padStart(2,"0")
   }
 
-const EMPRESAS = [
-  "VAREJO_URL_MERCATTO",
-  "VAREJO_URL_VILLA",
-  "VAREJO_URL_PADARIA",
-  "VAREJO_URL_DELICIA"
-]
+  const empresas = [
+    "VAREJO_URL_MERCATTO",
+    "VAREJO_URL_VILLA",
+    "VAREJO_URL_PADARIA",
+    "VAREJO_URL_DELICIA"
+  ]
 
-EMPRESAS.forEach(emp=>{
-  STATUS_EMPRESAS[emp] = "yellow"
-})
-
-
-
-  
   let all = []
 
   for(const emp of empresas){
 
     try{
 
-      STATUS_EMPRESAS[emp] = "yellow" // carregando
+// 🔥 PEGA TOKEN AUTOMATICAMENTE
+const login = await fetch("/api/login",{
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({ empresa: emp })
+})
 
-      const login = await fetch("/api/login",{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ empresa: emp })
-      })
+const loginJson = await login.json()
+const token = loginJson.accessToken || loginJson.token
 
-      const loginJson = await login.json()
-      const token = loginJson.accessToken || loginJson.token
+// 🔥 AGORA SIM FUNCIONA
+const resp = await fetch("/api/recebimentos",{
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({
+    token, // 🔥 ESSA LINHA RESOLVE
+    empresa: emp,
+    dataInicio: toDateOnly(hoje),
+    dataFim: toDateOnly(hoje)
+  })
+})
 
-      const resp = await fetch("/api/recebimentos",{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-          token,
-          empresa: emp,
-          dataInicio: toDateOnly(hoje),
-          dataFim: toDateOnly(hoje)
-        })
-      })
 
-      if(!resp.ok){
-        throw new Error("API OFF")
-      }
+
+
+
+      
 
       const json = await resp.json()
 
-      if(!json.items){
-        throw new Error("SEM DADOS")
-      }
-
-      const items = json.items.map(v=>({
+      const items = (json.items || []).map(v=>({
         raw: v,
         empresa_id: emp
       }))
 
-      const processado = process(items, t.inicio, t.fim)
-
-      // ✅ salvou último estado
-      if(processado[emp]){
-        ULTIMOS_DADOS[emp] = processado[emp]
-      }
-
-      STATUS_EMPRESAS[emp] = "green"
-
       all = all.concat(items)
 
     }catch(e){
-
-      console.log("❌ ERRO:", emp, e.message)
-
-      // 🔴 falhou
-      STATUS_EMPRESAS[emp] = "red"
-
-      // ⚠️ mantém último valor (não perde nada)
+      console.log("❌ ERRO TEMPO REAL:", emp, e.message)
     }
   }
 
   return all
 }
-
-
-setInterval(async ()=>{
-
-  console.log("🔄 INICIANDO LOOP TEMPO REAL")
-
-  try{
-
-    const novos = await buscarTempoReal()
-
-    console.log("📦 DADOS BRUTOS:", novos)
-
-    const dados = process(novos, t.inicio, t.fim)
-
-    console.log("⚙️ PROCESSADO:", dados)
-
-    Object.keys(ULTIMOS_DADOS).forEach(emp=>{
-      if(!dados[emp]){
-        dados[emp] = ULTIMOS_DADOS[emp]
-      }
-    })
-
-    render(dados)
-
-    console.log("✅ RENDER OK")
-
-  }catch(e){
-    console.log("❌ ERRO LOOP:", e)
-  }
-
-}, 5000)
 
 
 
