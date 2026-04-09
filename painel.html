@@ -276,7 +276,8 @@ const raw = lerJSONSeguro(v.raw)
 
 if(!raw) return null
 
-const id = v.venda_id || raw?.id || raw?.idExterno || Math.random()    // 🔥 BLOQUEIO DE DUPLICADOS
+const id = v.id || raw?.id
+    // 🔥 BLOQUEIO DE DUPLICADOS
     if(!id) return
     if(seen.has(id)) return
     seen.add(id)
