@@ -13,12 +13,6 @@ export default async function handler(req, res) {
 
   try {
 
-
-
-
-
-
-    
     const { token, dataInicio, dataFim, empresa } = req.body
 
     console.log("📥 BODY:", req.body)
