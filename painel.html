@@ -105,6 +105,17 @@ const sb = window.supabase.createClient(
   "sb_publishable_Jm2ZQKzPS3gNPCKSjFAmYQ_WNMYwF1j"
 )
 
+
+
+
+const STATUS_EMPRESAS = {}
+const ULTIMOS_DADOS = {}
+
+
+
+
+
+  
 // ================= MAPA ORIGINAL =================
 const MAPA_ORIGINAL = {
   VAREJO_URL_DELICIA: [
@@ -241,30 +252,29 @@ function turno(){
 
 // ================= PARSE =================
 function parse(v){
-const raw = lerJSONSeguro(v.raw)
-if(!raw) return null
-  // 🔥 PRIORIDADE 1: data completa do cupom
+  const raw = lerJSONSeguro(v.raw)
+  if(!raw) return null
+
   let dataHora = raw?.dataHoraFechamentoCupom
 
-  // 🔥 PRIORIDADE 2: montar manual (data + hora)
   if(!dataHora && raw?.data && raw?.hora){
     const h = raw.hora.padStart(4,"0")
     dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
   }
 
-  // 🔥 FALLBACK (último caso)
   if(!dataHora && raw?.data){
     dataHora = raw.data + "T00:00:00"
   }
 
-return {
-  data: dataHora,
-valor: 0, // NÃO USA MAIS
-  finais: raw?.finalizacoes || [],
-  cancelado: raw?.cancelada || raw?.cancelado || false
-}
-}
+  // 🔥 CORREÇÃO DEFINITIVA
+  const dataCorrigida = new Date(dataHora.replace("Z",""))
 
+  return {
+    data: dataCorrigida,
+    finais: raw?.finalizacoes || [],
+    cancelado: raw?.cancelada || raw?.cancelado || false
+  }
+}
 // ================= PROCESS =================
 function process(data, inicio, fim){
 
@@ -277,8 +287,7 @@ const raw = lerJSONSeguro(v.raw)
 
 if(!raw) return null
 
-const id = v.id || raw?.id
-    // 🔥 BLOQUEIO DE DUPLICADOS
+const id = v.venda_id || raw?.id || raw?.idExterno || Math.random()    // 🔥 BLOQUEIO DE DUPLICADOS
     if(!id) return
     if(seen.has(id)) return
     seen.add(id)
@@ -286,9 +295,7 @@ const id = v.id || raw?.id
 const p = parse(v)
 if(!p || !p.data) return
 
-    const d = new Date(p.data)
-
-
+const d = v.__dataCorrigida || new Date(p.data)
 
     
     if(d < inicio || d > fim) return
@@ -306,28 +313,54 @@ if(!p || !p.data) return
     }
 
     // 🔴 CANCELADOS
-    if(p.cancelado){
-      result[emp].cancelados++
-      result[emp].valorCancelado += p.valor
-      return
+if(p.cancelado){
+
+  let valorCancelado = 0
+
+  p.finais.forEach(f=>{
+    const bruto = Number(f.valor || 0)
+    const troco = Number(f.troco || 0)
+    const valor = bruto - troco
+
+    if(valor > 0){
+      valorCancelado += valor
     }
+  })
+
+  result[emp].cancelados++
+  result[emp].valorCancelado += valorCancelado
+
+  return
+}
 
     // ✅ VÁLIDOS
-    let totalCupom = 0
+let totalCupom = 0
+let tevePagamento = false
 
-    p.finais.forEach(f=>{
-const valor = Number(f.valor || 0) - Number(f.troco || 0)
+p.finais.forEach(f=>{
+
+  const bruto = Number(f.valor || 0)
+  const troco = Number(f.troco || 0)
+  const valor = bruto - troco
+
+  // 🔥 ignora lixo
+  if(valor <= 0) return
+
+  tevePagamento = true
   totalCupom += valor
 
-      const idf = Number(f.finalizadoraId)
-      const nome = MAPA[emp]?.[idf] || "OUTROS"
+  const idf = Number(f.finalizadoraId)
+  const nome = MAPA[emp]?.[idf] || "OUTROS"
 
-      result[emp].finais[nome] =
-        (result[emp].finais[nome] || 0) + valor
-    })
+  result[emp].finais[nome] =
+    (result[emp].finais[nome] || 0) + valor
+})
 
-    result[emp].total += totalCupom
-    result[emp].vendas++
+// 🔥 IGUAL AO VAREJO
+if(!tevePagamento) return
+
+result[emp].total += totalCupom
+result[emp].vendas++
 
   })
 
@@ -339,18 +372,39 @@ function render(dados){
   const grid = document.getElementById("grid")
   grid.innerHTML=""
 
-  Object.keys(dados).forEach(emp=>{
+  Object.keys(STATUS_EMPRESAS).forEach(emp=>{
 
-    const d = dados[emp]
+    const d = dados[emp] || ULTIMOS_DADOS[emp]
+
+    if(!d) return
+
+    const status = STATUS_EMPRESAS[emp] || "red"
+
+    const cor =
+      status === "green" ? "#22c55e" :
+      status === "yellow" ? "#f59e0b" :
+      "#ef4444"
 
     grid.innerHTML += `
       <div class="card">
-        <div class="empresa">${emp}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="empresa">${emp}</div>
+          <div style="
+            width:12px;
+            height:12px;
+            border-radius:50%;
+            background:${cor};
+          "></div>
+        </div>
+
         <div class="valor">${brl(d.total)}</div>
-<div>${d.vendas} vendas</div>
-<div style="color:red;font-size:12px">
-  ❌ ${d.cancelados} cancelados (${brl(d.valorCancelado)})
-</div>
+
+        <div>${d.vendas} vendas</div>
+
+        <div style="color:red;font-size:12px">
+          ❌ ${d.cancelados} cancelados (${brl(d.valorCancelado)})
+        </div>
+
         ${
           Object.entries(d.finais)
           .sort((a,b)=>b[1]-a[1])
@@ -363,7 +417,6 @@ function render(dados){
 
   renderChart(dados)
 }
-
 // ================= GRAFICO =================
 let chart
 function renderChart(d){
@@ -500,16 +553,118 @@ document.getElementById("fim").value = formatLocal(t.fim)
 
 load(t.inicio,t.fim)
 
-// ================= REALTIME =================
-sb.channel("rt")
-.on("postgres_changes",{
-  event:"INSERT",
-  schema:"public",
-  table:"cupons_importados"
-},()=>{
-  load(t.inicio,t.fim)
-})
-.subscribe()
+// ================= TEMPO REAL VIA API =================
+
+async function buscarTempoReal(){
+
+  const hoje = new Date()
+
+  function toDateOnly(date){
+    return date.getFullYear() + "-" +
+      String(date.getMonth()+1).padStart(2,"0") + "-" +
+      String(date.getDate()).padStart(2,"0")
+  }
+
+  const empresas = [
+    "VAREJO_URL_MERCATTO",
+    "VAREJO_URL_VILLA",
+    "VAREJO_URL_PADARIA",
+    "VAREJO_URL_DELICIA"
+  ]
+
+  let all = []
+
+  for(const emp of empresas){
+
+    try{
+
+      STATUS_EMPRESAS[emp] = "yellow" // carregando
+
+      const login = await fetch("/api/login",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ empresa: emp })
+      })
+
+      const loginJson = await login.json()
+      const token = loginJson.accessToken || loginJson.token
+
+      const resp = await fetch("/api/recebimentos",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          token,
+          empresa: emp,
+          dataInicio: toDateOnly(hoje),
+          dataFim: toDateOnly(hoje)
+        })
+      })
+
+      if(!resp.ok){
+        throw new Error("API OFF")
+      }
+
+      const json = await resp.json()
+
+      if(!json.items){
+        throw new Error("SEM DADOS")
+      }
+
+      const items = json.items.map(v=>({
+        raw: v,
+        empresa_id: emp
+      }))
+
+      const processado = process(items, t.inicio, t.fim)
+
+      // ✅ salvou último estado
+      if(processado[emp]){
+        ULTIMOS_DADOS[emp] = processado[emp]
+      }
+
+      STATUS_EMPRESAS[emp] = "green"
+
+      all = all.concat(items)
+
+    }catch(e){
+
+      console.log("❌ ERRO:", emp, e.message)
+
+      // 🔴 falhou
+      STATUS_EMPRESAS[emp] = "red"
+
+      // ⚠️ mantém último valor (não perde nada)
+    }
+  }
+
+  return all
+}
+
+
+
+setInterval(async ()=>{
+
+  const novos = await buscarTempoReal()
+
+  const dados = process(novos, t.inicio, t.fim)
+
+  // mistura com antigos (não perde nada)
+  Object.keys(ULTIMOS_DADOS).forEach(emp=>{
+    if(!dados[emp]){
+      dados[emp] = ULTIMOS_DADOS[emp]
+    }
+  })
+
+  render(dados)
+
+}, 5000)
+
+
+
+
+
+
+  
 function lerJSONSeguro(raw){
 
   try{
