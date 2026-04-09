@@ -580,9 +580,9 @@ const resp = await fetch("/api/recebimentos",{
 
 
 
-  setInterval(async ()=>{
+setInterval(async ()=>{
 
-  console.log("🔄 TEMPO REAL...")
+  console.log("🔄 ATUALIZAÇÃO PROGRAMADA (10 MIN)")
 
   const novos = await buscarTempoReal()
 
@@ -590,9 +590,7 @@ const resp = await fetch("/api/recebimentos",{
 
   render(dados)
 
-}, 5000) // 5 segundos
-
-
+}, 600000) // 10 minutos
 
 
 
