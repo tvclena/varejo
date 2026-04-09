@@ -314,8 +314,8 @@ if(!p || !p.data) return
     let totalCupom = 0
 
     p.finais.forEach(f=>{
-      const valor = Number(f.valor || 0)
-      totalCupom += valor
+const valor = (Number(f.valor || 0) - Number(f.troco || 0))
+totalCupom += valor
 
       const idf = Number(f.finalizadoraId)
       const nome = MAPA[emp]?.[idf] || "OUTROS"
