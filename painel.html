@@ -506,8 +506,8 @@ document.getElementById("fim").value = formatLocal(t.fim)
 
   
 
-load(t.inicio,t.fim)
-
+const tInicial = turno()
+load(tInicial.inicio, tInicial.fim)
 // ================= TEMPO REAL VIA API =================
 
 async function buscarTempoReal(){
@@ -580,20 +580,17 @@ const resp = await fetch("/api/recebimentos",{
 
 
 
-  setInterval(async ()=>{
+setInterval(async ()=>{
+  console.log("🔄 REFRESH COMPLETO (API)")
 
-  console.log("🔄 TEMPO REAL...")
+  const t = turno() // 🔥 recalcula sempre
 
   const novos = await buscarTempoReal()
-
   const dados = process(novos, t.inicio, t.fim)
 
   render(dados)
 
-}, 5000) // 5 segundos
-
-
-
+}, 600000)
 
 
 
