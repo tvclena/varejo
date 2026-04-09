@@ -241,30 +241,29 @@ function turno(){
 
 // ================= PARSE =================
 function parse(v){
-const raw = lerJSONSeguro(v.raw)
-if(!raw) return null
-  // 🔥 PRIORIDADE 1: data completa do cupom
+  const raw = lerJSONSeguro(v.raw)
+  if(!raw) return null
+
   let dataHora = raw?.dataHoraFechamentoCupom
 
-  // 🔥 PRIORIDADE 2: montar manual (data + hora)
   if(!dataHora && raw?.data && raw?.hora){
     const h = raw.hora.padStart(4,"0")
     dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
   }
 
-  // 🔥 FALLBACK (último caso)
   if(!dataHora && raw?.data){
     dataHora = raw.data + "T00:00:00"
   }
 
-return {
-  data: dataHora,
-valor: 0, // NÃO USA MAIS
-  finais: raw?.finalizacoes || [],
-  cancelado: raw?.cancelada || raw?.cancelado || false
-}
-}
+  // 🔥 CORREÇÃO DEFINITIVA
+  const dataCorrigida = new Date(dataHora.replace("Z",""))
 
+  return {
+    data: dataCorrigida,
+    finais: raw?.finalizacoes || [],
+    cancelado: raw?.cancelada || raw?.cancelado || false
+  }
+}
 // ================= PROCESS =================
 function process(data, inicio, fim){
 
