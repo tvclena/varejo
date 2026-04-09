@@ -1,636 +1,69 @@
-<!DOCTYPE html>
+
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>PAINEL DV</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realtime Vendas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-
 <style>
-body{
-  margin:0;
-  font-family:Inter;
-  background:#f8fafc;
-}
-
-header{
-  padding:20px;
-  background:#fff;
-  border-bottom:1px solid #eee;
-  display:flex;
-  justify-content:space-between;
-}
-
-.controls{
-  padding:15px;
-  background:#fff;
-  display:flex;
-  gap:10px;
-}
-
-input,button{
-  padding:10px;
-  border-radius:10px;
-  border:1px solid #ddd;
-}
-
-button{
-  background:#2563eb;
-  color:#fff;
-  font-weight:700;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
-  gap:15px;
-  padding:15px;
-}
-
-.card{
-  background:#fff;
-  border-radius:14px;
-  padding:18px;
-  box-shadow:0 10px 25px rgba(0,0,0,0.05);
-}
-
-.empresa{
-  font-size:13px;
-  color:#64748b;
-  font-weight:700;
-}
-
-.valor{
-  font-size:30px;
-  font-weight:800;
-  color:#16a34a;
-}
-
-.item{
-  display:flex;
-  justify-content:space-between;
-  font-size:12px;
-  margin-top:4px;
-}
+body{background:#060b1a;color:#fff;font-family:Arial}
+.card{padding:10px;border-bottom:1px solid #333}
 </style>
 </head>
-
 <body>
 
-<header>
-  <div>PAINEL DV</div>
-  <div id="status"></div>
-</header>
-
-<div class="controls">
-  <input type="datetime-local" id="inicio">
-  <input type="datetime-local" id="fim">
-  <button onclick="reload()">Aplicar</button>
-</div>
-
-<div id="periodo" style="padding:10px;color:#64748b"></div>
-
-<div id="grid" class="grid"></div>
-
-<canvas id="grafico"></canvas>
+<h2>🔥 Vendas em Tempo Real</h2>
+<div id="vendas"></div>
 
 <script>
-
-// ================= SUPABASE =================
-const sb = window.supabase.createClient(
+const supabase = window.supabase.createClient(
   "https://ehxrrpsiksceljmhsfxk.supabase.co",
   "sb_publishable_Jm2ZQKzPS3gNPCKSjFAmYQ_WNMYwF1j"
-)
+);
 
-// ================= MAPA ORIGINAL =================
-const MAPA_ORIGINAL = {
-  VAREJO_URL_DELICIA: [
-  { id: "1", descricao: "DINHEIRO" },
-  { id: "2", descricao: "CARTAO DE CREDITO" },
-  { id: "3", descricao: "CARTAO DE DEBITO" },
-  { id: "4", descricao: "CONSUMO FUNCIONARIOS" },
-  { id: "5", descricao: "CREDIARIO CLIENTES" },
-  { id: "7", descricao: "VOUCHER" },
-  { id: "8", descricao: "PAGAMENTOS ONLINE" },
-  { id: "10", descricao: "CONSUMO MUSICOS" },
-  { id: "11", descricao: "CREDITO POS" },
-  { id: "12", descricao: "DEBITO POS" },
-  { id: "13", descricao: "CLIENTES EM DEBITO" },
-  { id: "14", descricao: "BOLETO BANCARIO" },
-  { id: "15", descricao: "CHEQUE" },
-  { id: "16", descricao: "BONIFICACAO" },
-  { id: "21", descricao: "PIX QRCODE" },
-  { id: "22", descricao: "PIX CNPJ" },
-  { id: "23", descricao: "CREDITO DELIVERY" },
-  { id: "24", descricao: "DEBITO DELIVERY" },
-  { id: "27", descricao: "VOUCHER POS" },
-  { id: "28", descricao: "VOUCHER DELICIA" },
-  { id: "29", descricao: "CONSUMO SOCIO" }
-],
-  VAREJO_URL_VILLA: [
-  { id: "1", descricao: "DINHEIRO" },
-  { id: "2", descricao: "CARTAO DE DEBITO" },
-  { id: "3", descricao: "CARTAO DE CREDITO" },
-  { id: "4", descricao: "CREDIARIO CLIENTES" },
-  { id: "5", descricao: "CONSUMO FUNCIONARIOS" },
-  { id: "6", descricao: "VOUCHER" },
-  { id: "7", descricao: "CONSUMO MUSICOS" },
-  { id: "8", descricao: "ERROS LANCAMENTOS" },
-  { id: "9", descricao: "CLIENTES EM DEBITO" },
-  { id: "10", descricao: "PAGAMENTOS ONLINE" },
-  { id: "11", descricao: "TRANSFERENCIA BANCAR" },
-  { id: "12", descricao: "PIX" },
-  { id: "13", descricao: "CHEQUE" },
-  { id: "14", descricao: "BOLETO BANCARIO" },
-  { id: "15", descricao: "CREDITO ANTECIPADO" },
-  { id: "16", descricao: "PAGAMENTO ANTECIPADO" },
-  { id: "17", descricao: "CATALOGO DELIVERY" },
-  { id: "18", descricao: "CART CREDITO POS" },
-  { id: "19", descricao: "CART DEBITO POS" },
-  { id: "20", descricao: "PIX ITAU" },
-  { id: "22", descricao: "PIX POS" },
-  { id: "23", descricao: "VOUCHER POS" },
-  { id: "24", descricao: "BONIFICACAO" },
-  { id: "25", descricao: "CONSUMO SOCIO" },
-  { id: "26", descricao: "ERROS GARCONS" },
-  { id: "27", descricao: "BONIFICACAO GERENCIA" },
-  { id: "28", descricao: "CARTAO DEBITO VCH" },
-  { id: "29", descricao: "CARTAO CREDITO VCH" },
-  { id: "30", descricao: "PIX ITAU VCH" }
-],
-  VAREJO_URL_PADARIA: [
-  { id: "1", descricao: "DINHEIRO" },
-  { id: "2", descricao: "CARTAO DE CREDITO" },
-  { id: "3", descricao: "CARTAO DE DEBITO" },
-  { id: "4", descricao: "PIX" },
-  { id: "5", descricao: "BOLETO" },
-  { id: "6", descricao: "CONSUMO FUNCIONARIOS" },
-  { id: "8", descricao: "CARTAO VOUCHER" },
-  { id: "10", descricao: "CREDITO DELIVERY" },
-  { id: "11", descricao: "DEBITO DELIVERY" },
-  { id: "12", descricao: "PIX OFFLINE" },
-  { id: "13", descricao: "PAGAMENTO ONLINE" },
-  { id: "14", descricao: "CONSUMO SOCIO" },
-  { id: "15", descricao: "VOUCHER POS" },
-  { id: "", descricao: "SEM FATURAMENTO" }
-],
-  VAREJO_URL_MERCATTO: [
-  { "id": "1", "descricao": "DINHEIRO" },
-  { "id": "2", "descricao": "CARTAO CREDITO TEF" },
-  { "id": "3", "descricao": "CARTAO DEBITO TEF" },
-  { "id": "4", "descricao": "PIX CNPJ" },
-  { "id": "5", "descricao": "CONSUMO FUNCIONARIOS" },
-  { "id": "6", "descricao": "REFEICAO ALIME. TEF" },
-  { "id": "7", "descricao": "TOTEM CREDITO" },
-  { "id": "8", "descricao": "TOTEM DEBITO" },
-  { "id": "9", "descricao": "BONIFICACAO" },
-  { "id": "10", "descricao": "BOLETO" },
-  { "id": "11", "descricao": "PGTO ONLINE CREDITO" },
-  { "id": "15", "descricao": "PIX QRCODE POS" },
-  { "id": "16", "descricao": "PIX TEF" },
-  { "id": "17", "descricao": "CREDITO POS" },
-  { "id": "18", "descricao": "DEBITO POS" },
-  { "id": "19", "descricao": "CART ALIMENTACAO POS" },
-  { "id": "20", "descricao": "BOLETO FAMILY PRODUT" },
-  { "id": "21", "descricao": "BOLETO FOODS TIME" },
-  { "id": "22", "descricao": "BOLETO DELICIA PRODU" },
-  { "id": "23", "descricao": "BOLETO MEOS GOURMET" },
-  { "id": "24", "descricao": "BOLETO ALL TIME CHOP" },
-  { "id": "25", "descricao": "BOLETO MERCATTO KIDS" },
-  { "id": "26", "descricao": "CREDIARIO CLIENTES" },
-  { "id": "27", "descricao": "CONSUMO SOCIO" },
-  { "id": "28", "descricao": "BOLETO DELICIA INDUS" },
-  { "id": "29", "descricao": "VOUCHER" },
-  { "id": "32", "descricao": "PAGAMENTO ONLINE" },
-  { "id": "33", "descricao": "VOUCHER POS" },
-  { "id": "34", "descricao": "MARKETING" },
-  { "id": "35", "descricao": "VALE MERCATTO" },
-  { "id": "36", "descricao": "PREJUIZO" }
-]
+const container = document.getElementById("vendas");
+
+function render(v){
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `
+    🧾 ${v.venda_id}<br>
+    💰 R$ ${Number(v.valor).toFixed(2)}<br>
+    💳 Finalizadora: ${v.finalizadora_principal}
+  `;
+  container.prepend(el);
 }
 
-// ================= TRANSFORMA MAPA =================
-const MAPA = {}
+async function load(){
+  const { data } = await supabase
+    .from("vendas_realtime")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-Object.keys(MAPA_ORIGINAL).forEach(emp=>{
-  MAPA[emp] = {}
-  MAPA_ORIGINAL[emp].forEach(f=>{
-    MAPA[emp][Number(f.id)] = f.descricao
+  data.forEach(render);
+}
+
+supabase
+  .channel("vendas")
+  .on("postgres_changes", {
+    event: "INSERT",
+    schema: "public",
+    table: "vendas_realtime"
+  }, payload => {
+    render(payload.new);
   })
-})
-
-// ================= FORMAT =================
-const brl = v => Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})
-
-// ================= TURNO =================
-function turno(){
-  const now = new Date()
-
-  const inicio = new Date(now)
-  inicio.setHours(5,0,0,0)
-
-  const fim = new Date(inicio)
-  fim.setDate(fim.getDate()+1)
-  fim.setHours(4,0,0,0)
-
-  return {inicio,fim}
-}
-
-// ================= PARSE =================
-function parse(v){
-  const raw = lerJSONSeguro(v.raw)
-  if(!raw) return null
-
-  let dataHora = raw?.dataHoraFechamentoCupom
-
-  if(!dataHora && raw?.data && raw?.hora){
-    const h = raw.hora.padStart(4,"0")
-    dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
-  }
-
-  if(!dataHora && raw?.data){
-    dataHora = raw.data + "T00:00:00"
-  }
-
-  // 🔥 CORREÇÃO DEFINITIVA
-  const dataCorrigida = new Date(dataHora.replace("Z",""))
-
-  return {
-    data: dataCorrigida,
-    finais: raw?.finalizacoes || [],
-    cancelado: raw?.cancelada || raw?.cancelado || false
-  }
-}
-// ================= PROCESS =================
-function process(data, inicio, fim){
-
-  const result = {}
-  const seen = new Set() // 🔥 CONTROLE DE DUPLICADOS
-
-  data.forEach(v=>{
-
-const raw = lerJSONSeguro(v.raw)
-
-if(!raw) return null
-
-const id = v.venda_id || raw?.id || raw?.idExterno || Math.random()    // 🔥 BLOQUEIO DE DUPLICADOS
-    if(!id) return
-    if(seen.has(id)) return
-    seen.add(id)
-
-const p = parse(v)
-if(!p || !p.data) return
-
-const d = v.__dataCorrigida || new Date(p.data)
-
-    
-    if(d < inicio || d > fim) return
-
-    const emp = v.empresa_id
-
-    if(!result[emp]){
-      result[emp]={
-        total:0,
-        vendas:0,
-        cancelados:0,
-        valorCancelado:0,
-        finais:{}
-      }
-    }
-
-    // 🔴 CANCELADOS
-    if(p.cancelado){
-      result[emp].cancelados++
-      result[emp].valorCancelado += p.valor
-      return
-    }
-
-    // ✅ VÁLIDOS
-let totalCupom = 0
-let tevePagamento = false
-
-p.finais.forEach(f=>{
-
-  const bruto = Number(f.valor || 0)
-const troco =
-  Number(f.troco || 0) +
-  Number(f.trocoDoacao || 0) +
-  Number(f.trocoEmDinheiroParaSerDevolvido || 0)
-  const valor = bruto - troco
-
-  // 🔥 ignora lixo
-  if(valor <= 0) return
-
-  tevePagamento = true
-  totalCupom += valor
-
-  const idf = Number(f.finalizadoraId)
-  const nome = MAPA[emp]?.[idf] || "OUTROS"
-
-  result[emp].finais[nome] =
-    (result[emp].finais[nome] || 0) + valor
-})
-
-// 🔥 IGUAL AO VAREJO
-if(!tevePagamento) return
-
-result[emp].total += totalCupom
-result[emp].vendas++
-
-  })
-
-  return result
-}
-// ================= RENDER =================
-function render(dados){
-
-  const grid = document.getElementById("grid")
-  grid.innerHTML=""
-
-  Object.keys(dados).forEach(emp=>{
-
-    const d = dados[emp]
-
-    grid.innerHTML += `
-      <div class="card">
-        <div class="empresa">${emp}</div>
-        <div class="valor">${brl(d.total)}</div>
-<div>${d.vendas} vendas</div>
-<div style="color:red;font-size:12px">
-  ❌ ${d.cancelados} cancelados (${brl(d.valorCancelado)})
-</div>
-        ${
-          Object.entries(d.finais)
-          .sort((a,b)=>b[1]-a[1])
-          .map(f=>`<div class="item">${f[0]} <b>${brl(f[1])}</b></div>`)
-          .join("")
-        }
-      </div>
-    `
-  })
-
-  renderChart(dados)
-}
-
-// ================= GRAFICO =================
-let chart
-function renderChart(d){
-
-  const labels = Object.keys(d)
-  const values = labels.map(e=>d[e].total)
-
-  if(chart) chart.destroy()
-
-  chart = new Chart(grafico,{
-    type:"bar",
-    data:{
-      labels,
-      datasets:[{
-        label:"Faturamento",
-        data:values
-      }]
-    }
-  })
-}
-
-// ================= LOAD =================
-async function load(inicio, fim){
-
-  let all = []
-  let from = 0
-  const step = 300
-
-  // 🔥 CONVERTE PARA YYYY-MM-DD (CORRETO PRO SUPABASE)
-  function toDateOnly(date){
-    const d = new Date(date)
-    return d.getFullYear() + "-" +
-      String(d.getMonth()+1).padStart(2,"0") + "-" +
-      String(d.getDate()).padStart(2,"0")
-  }
-
-  const inicioISO = toDateOnly(inicio)
-  const fimISO = toDateOnly(fim)
-
-  console.log("📅 FILTRO BANCO:", inicioISO, "→", fimISO)
-
-  // ================= PAGINAÇÃO =================
-  while(true){
-
-    const { data, error } = await sb
-      .from("cupons_importados")
-      .select("empresa_id,data,raw")
-      .gte("data", inicioISO)
-      .lte("data", fimISO)
-      .range(from, from + step - 1)
-
-    if(error){
-      console.error("❌ ERRO SUPABASE:", error)
-      break
-    }
-
-    if(!data || data.length === 0) break
-
-    all = all.concat(data)
-
-    if(data.length < step) break
-
-    from += step
-  }
-
-  console.log("📊 TOTAL CARREGADO:", all.length)
-
-  // ================= PROCESS =================
-
-  function parseLocal(dateStr){
-    // 🔥 REMOVE UTC BUG
-    return new Date(dateStr.replace("Z",""))
-  }
-
-  const dados = process(
-    all.map(v=>{
-      const raw = lerJSONSeguro(v.raw)
-
-      if(!raw) return null
-
-      let dataHora = raw?.dataHoraFechamentoCupom
-
-      if(!dataHora && raw?.data && raw?.hora){
-        const h = raw.hora.padStart(4,"0")
-        dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
-      }
-
-      if(!dataHora && raw?.data){
-        dataHora = raw.data + "T00:00:00"
-      }
-
-      return {
-        ...v,
-        __dataCorrigida: parseLocal(dataHora)
-      }
-
-    }).filter(Boolean),
-
-    inicio,
-    fim
-  )
-
-  render(dados)
-
-  document.getElementById("status").innerText =
-    "Atualizado " + new Date().toLocaleTimeString()
-
-  document.getElementById("periodo").innerText =
-    `Período: ${inicio.toLocaleString()} → ${fim.toLocaleString()}`
-}
-
-// ================= RELOAD =================
-function reload(){
-
-  const inicio = new Date(document.getElementById("inicio").value)
-  const fim = new Date(document.getElementById("fim").value)
-
-  load(inicio,fim)
-}
-
-// ================= START =================
-const t = turno()
-
-function formatLocal(date){
-  const pad = n => String(n).padStart(2,"0")
-
-  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-document.getElementById("inicio").value = formatLocal(t.inicio)
-document.getElementById("fim").value = formatLocal(t.fim)
-
-  
-
-load(t.inicio,t.fim)
-
-// ================= TEMPO REAL VIA API =================
-
-async function buscarTempoReal(){
-
-  const hoje = new Date()
-
-  function toDateOnly(date){
-    return date.getFullYear() + "-" +
-      String(date.getMonth()+1).padStart(2,"0") + "-" +
-      String(date.getDate()).padStart(2,"0")
-  }
-
-  const empresas = [
-    "VAREJO_URL_MERCATTO",
-    "VAREJO_URL_VILLA",
-    "VAREJO_URL_PADARIA",
-    "VAREJO_URL_DELICIA"
-  ]
-
-  let all = []
-
-  for(const emp of empresas){
-
-    try{
-
-// 🔥 PEGA TOKEN AUTOMATICAMENTE
-const login = await fetch("/api/login",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({ empresa: emp })
-})
-
-const loginJson = await login.json()
-const token = loginJson.accessToken || loginJson.token
-
-// 🔥 AGORA SIM FUNCIONA
-const resp = await fetch("/api/recebimentos",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({
-    token, // 🔥 ESSA LINHA RESOLVE
-    empresa: emp,
-    dataInicio: toDateOnly(hoje),
-    dataFim: toDateOnly(hoje)
-  })
-})
-
-
-
-
-
-      
-
-      const json = await resp.json()
-
-      const items = (json.items || []).map(v=>({
-        raw: v,
-        empresa_id: emp
-      }))
-
-      all = all.concat(items)
-
-    }catch(e){
-      console.log("❌ ERRO TEMPO REAL:", emp, e.message)
-    }
-  }
-
-  return all
-}
-
-
-
-  setInterval(async ()=>{
-
-  console.log("🔄 TEMPO REAL...")
-
-  const novos = await buscarTempoReal()
-
-  const dados = process(novos, t.inicio, t.fim)
-
-  render(dados)
-
-}, 5000) // 5 segundos
-
-
-
-
-
-
-  
-function lerJSONSeguro(raw){
-
-  try{
-
-    // já é objeto → retorna direto
-    if(typeof raw === "object"){
-      return raw
-    }
-
-    // não é string → inválido
-    if(typeof raw !== "string"){
-      return null
-    }
-
-    // 1º parse
-    let parsed = JSON.parse(raw)
-
-    // se ainda for string → parse de novo
-    if(typeof parsed === "string"){
-      parsed = JSON.parse(parsed)
-    }
-
-    return parsed
-
-  }catch(e){
-    console.log("❌ ERRO AO LER JSON:", e.message)
-    console.log("📦 RAW PROBLEMÁTICO:", raw)
-    return null
-  }
-}
+  .subscribe();
+
+setInterval(()=>{
+  fetch("/api/sync-vendas",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({empresa:"VAREJO_URL_MERCATTO"})
+  });
+},10000);
+
+load();
 </script>
 
 </body>
