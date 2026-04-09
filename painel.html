@@ -269,26 +269,11 @@ return {
 function process(data, inicio, fim){
 
   const result = {}
-  const seen = new Set() // 🔥 CONTROLE DE DUPLICADOS
 
   data.forEach(v=>{
 
-const raw = lerJSONSeguro(v.raw)
-
-if(!raw) return null
-
-    const id = raw?.id
-
-    // 🔥 BLOQUEIO DE DUPLICADOS
-    if(!id) return
-    if(seen.has(id)) return
-    seen.add(id)
-
-const p = parse(v)
-if(!p || !p.data) return
-
-    const d = new Date(p.data)
-    d.setHours(d.getHours() - 3)
+    // 🔥 DATA CORRETA (SEM FUSO BUGADO)
+    const d = new Date(v.data + "T12:00:00")
 
     if(d < inicio || d > fim) return
 
@@ -305,28 +290,32 @@ if(!p || !p.data) return
     }
 
     // 🔴 CANCELADOS
-    if(p.cancelado){
+    if(v.cancelado){
       result[emp].cancelados++
-      result[emp].valorCancelado += p.valor
+      result[emp].valorCancelado += Number(v.valor_total || v.valor || 0)
       return
     }
 
-    // ✅ VÁLIDOS
-    let totalCupom = 0
-
-    p.finais.forEach(f=>{
-      const valor = Number(f.valor || 0)
-      totalCupom += valor
-
-      const idf = Number(f.finalizadoraId)
-      const nome = MAPA[emp]?.[idf] || "OUTROS"
-
-      result[emp].finais[nome] =
-        (result[emp].finais[nome] || 0) + valor
-    })
+    // ✅ TOTAL REAL (OFICIAL DO CUPOM)
+    const totalCupom = Number(v.valor_total || v.valor || 0)
 
     result[emp].total += totalCupom
     result[emp].vendas++
+
+    // 🔥 FINALIZADORAS (APENAS PARA VISUAL)
+    const raw = lerJSONSeguro(v.raw)
+
+    if(raw?.finalizacoes){
+      raw.finalizacoes.forEach(f=>{
+        const valor = Number(f.valor || 0)
+
+        const idf = Number(f.finalizadoraId)
+        const nome = MAPA[emp]?.[idf] || "OUTROS"
+
+        result[emp].finais[nome] =
+          (result[emp].finais[nome] || 0) + valor
+      })
+    }
 
   })
 
@@ -389,7 +378,7 @@ async function load(inicio, fim){
 
   let all = []
   let from = 0
-  const step = 300
+  const step = 1000
 
   // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
   const inicioISO = inicio.toISOString()
@@ -399,7 +388,7 @@ async function load(inicio, fim){
 
     const { data, error } = await sb
       .from("cupons_importados")
-      .select("empresa_id,data,raw") // 🔥 NÃO USA *
+.select("empresa_id,data,valor,valor_total,cancelado,raw")
       .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
       .lte("data", fimISO)
       .range(from, from + step - 1)
