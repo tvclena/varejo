@@ -315,7 +315,10 @@ let tevePagamento = false
 p.finais.forEach(f=>{
 
   const bruto = Number(f.valor || 0)
-  const troco = Number(f.troco || 0)
+const troco =
+  Number(f.troco || 0) +
+  Number(f.trocoDoacao || 0) +
+  Number(f.trocoEmDinheiroParaSerDevolvido || 0)
   const valor = bruto - troco
 
   // 🔥 ignora lixo
