@@ -313,21 +313,33 @@ if(!p || !p.data) return
     }
 
     // ✅ VÁLIDOS
-    let totalCupom = 0
+let totalCupom = 0
+let tevePagamento = false
 
-    p.finais.forEach(f=>{
-const valor = Number(f.valor || 0) - Number(f.troco || 0)
+p.finais.forEach(f=>{
+
+  const bruto = Number(f.valor || 0)
+  const troco = Number(f.troco || 0)
+  const valor = bruto - troco
+
+  // 🔥 ignora lixo
+  if(valor <= 0) return
+
+  tevePagamento = true
   totalCupom += valor
 
-      const idf = Number(f.finalizadoraId)
-      const nome = MAPA[emp]?.[idf] || "OUTROS"
+  const idf = Number(f.finalizadoraId)
+  const nome = MAPA[emp]?.[idf] || "OUTROS"
 
-      result[emp].finais[nome] =
-        (result[emp].finais[nome] || 0) + valor
-    })
+  result[emp].finais[nome] =
+    (result[emp].finais[nome] || 0) + valor
+})
 
-    result[emp].total += totalCupom
-    result[emp].vendas++
+// 🔥 IGUAL AO VAREJO
+if(!tevePagamento) return
+
+result[emp].total += totalCupom
+result[emp].vendas++
 
   })
 
