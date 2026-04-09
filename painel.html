@@ -258,7 +258,7 @@ if(!raw) return null
   }
 
 return {
-  data: dataHora,
+  data: toBahia(dataHora),
   valor: Number(raw?.valor || 0),
   finais: raw?.finalizacoes || [],
   cancelado: raw?.cancelada || raw?.cancelado || false
@@ -286,8 +286,17 @@ const id = v.id || raw?.id
 const p = parse(v)
 if(!p || !p.data) return
 
-    const d = new Date(p.data)
+function toBahia(date){
+  return new Date(
+    new Date(date).toLocaleString("en-US",{ timeZone:"America/Bahia" })
+  )
+}
 
+const d = toBahia(p.data)
+
+
+
+    
 
 
     
