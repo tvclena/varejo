@@ -449,44 +449,7 @@ async function load(inicio, fim){
   }
 }
 
-  
-  // ================= PROCESS =================
-
-  function parseLocal(dateStr){
-    // 🔥 REMOVE UTC BUG
-    return new Date(dateStr.replace("Z",""))
-  }
-
-  const dados = process(
-    all.map(v=>{
-      const raw = lerJSONSeguro(v.raw)
-
-      if(!raw) return null
-
-      let dataHora = raw?.dataHoraFechamentoCupom
-
-      if(!dataHora && raw?.data && raw?.hora){
-        const h = raw.hora.padStart(4,"0")
-        dataHora = `${raw.data}T${h.slice(0,2)}:${h.slice(2,4)}:00`
-      }
-
-      if(!dataHora && raw?.data){
-        dataHora = raw.data + "T00:00:00"
-      }
-
-      return {
-        ...v,
-        __dataCorrigida: parseLocal(dataHora)
-      }
-
-    }).filter(Boolean),
-
-    inicio,
-    fim
-  )
-
-  render(dados)
-
+ 
   document.getElementById("status").innerText =
     "Atualizado " + new Date().toLocaleTimeString()
 
