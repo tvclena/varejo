@@ -11,8 +11,6 @@ export default async function handler(req, res){
       process.env.SUPABASE_SERVICE_ROLE
     )
 
-
-    
     const empresas = [
       { id:"VAREJO_URL_DELICIA", nome:"DELÍCIA" },
       { id:"VAREJO_URL_VILLA", nome:"VILLA" },
@@ -27,20 +25,8 @@ export default async function handler(req, res){
 
     const hoje = new Date().toISOString().slice(0,10)
 
-const empresaIndex = Number(req.query.idx || 0)
+    for(const emp of empresas){
 
-const empresas = [
-  { id:"VAREJO_URL_DELICIA", nome:"DELÍCIA" },
-  { id:"VAREJO_URL_VILLA", nome:"VILLA" },
-  { id:"VAREJO_URL_PADARIA", nome:"PADARIA" },
-  { id:"VAREJO_URL_MERCATTO", nome:"MERCATTO" }
-]
-
-const emp = empresas[empresaIndex % empresas.length]
-
-console.log("🎯 EMPRESA DA VEZ:", emp.nome)
-
-    
       console.log("━━━━━━━━━━━━━━━━━━━━━━━")
       console.log("🏢 EMPRESA:", emp.nome)
       console.log("📅 DATA:", hoje)
