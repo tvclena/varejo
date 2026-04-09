@@ -278,7 +278,8 @@ const raw = lerJSONSeguro(v.raw)
 
 if(!raw) return null
 
-const id = v.id || raw?.id
+    const id = raw?.id
+
     // 🔥 BLOQUEIO DE DUPLICADOS
     if(!id) return
     if(seen.has(id)) return
@@ -288,10 +289,8 @@ const p = parse(v)
 if(!p || !p.data) return
 
     const d = new Date(p.data)
+    d.setHours(d.getHours() - 3)
 
-
-
-    
     if(d < inicio || d > fim) return
 
     const emp = v.empresa_id
@@ -317,8 +316,8 @@ if(!p || !p.data) return
     let totalCupom = 0
 
     p.finais.forEach(f=>{
-const valor = Number(f.valor || 0) - Number(f.troco || 0)
-  totalCupom += valor
+      const valor = Number(f.valor || 0)
+      totalCupom += valor
 
       const idf = Number(f.finalizadoraId)
       const nome = MAPA[emp]?.[idf] || "OUTROS"
@@ -389,67 +388,43 @@ function renderChart(d){
 // ================= LOAD =================
 async function load(inicio, fim){
 
-  const status = document.getElementById("status")
-  status.innerHTML = "🔄 carregando..."
+  let all = []
+  let from = 0
+  const step = 300
 
-  try{
+  // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
+  const inicioISO = inicio.toISOString()
+  const fimISO = fim.toISOString()
 
-    const inicioISO = inicio.toISOString().slice(0,10)
-    const fimISO = fim.toISOString().slice(0,10)
+  while(true){
 
-    console.log("📅 BUSCA:", inicioISO, fimISO)
-
-    // 🔥 BUSCA DIRETO AGRUPADO
     const { data, error } = await sb
       .from("cupons_importados")
-      .select("empresa_id, valor_total, cancelado")
-      .gte("data", inicioISO)
+      .select("empresa_id,data,raw") // 🔥 NÃO USA *
+      .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
       .lte("data", fimISO)
+      .range(from, from + step - 1)
 
     if(error){
-      console.log("❌ ERRO:", error)
-      return
+      console.error("❌ ERRO SUPABASE:", error)
+      break
     }
 
-    console.log("📦 TOTAL REGISTROS:", data.length)
+    if(!data || data.length === 0) break
 
-    // 🔥 PROCESSAMENTO LEVE (SEM RAW)
-    const result = {}
+    all = all.concat(data)
 
-    data.forEach(c=>{
+    if(data.length < step) break
 
-      const emp = c.empresa_id
-
-      if(!result[emp]){
-        result[emp] = {
-          total:0,
-          vendas:0,
-          cancelados:0,
-          valorCancelado:0
-        }
-      }
-
-      if(c.cancelado){
-        result[emp].cancelados++
-        result[emp].valorCancelado += Number(c.valor_total || 0)
-      }else{
-        result[emp].total += Number(c.valor_total || 0)
-        result[emp].vendas++
-      }
-
-    })
-
-    render(result)
-
-    status.innerHTML = "🟢 atualizado"
-
-  }catch(e){
-    console.log("❌ ERRO LOAD:", e)
-    status.innerHTML = "🔴 erro"
+    from += step
   }
-}
 
- 
+  console.log("📊 TOTAL CARREGADO:", all.length)
+
+  const dados = process(all, inicio, fim)
+
+  render(dados)
+
   document.getElementById("status").innerText =
     "Atualizado " + new Date().toLocaleTimeString()
 
@@ -482,51 +457,16 @@ document.getElementById("fim").value = formatLocal(t.fim)
 
 load(t.inicio,t.fim)
 
-// 🔥 REALTIME SUPABASE (COLOCAR AQUI)
-sb.channel("realtime_vendas")
-.on("postgres_changes",{
-  event:"INSERT",
-  schema:"public",
-  table:"cupons_importados"
-},(payload)=>{
-
-  console.log("⚡ NOVA VENDA:", payload.new)
-
-  const t = turno()
-  load(t.inicio, t.fim)
-
-})
-.subscribe((s)=>{
-  console.log("📡 REALTIME:", s)
-})
-
-
-  
 // ================= REALTIME =================
 sb.channel("rt")
 .on("postgres_changes",{
   event:"INSERT",
   schema:"public",
   table:"cupons_importados"
-},(payload)=>{
-
-  console.log("━━━━━━━━━━━━━━━━━━━━━━")
-  console.log("⚡ NOVO CUPOM INSERIDO")
-  console.log("📦 DADOS:", payload.new)
-  console.log("🏢 EMPRESA:", payload.new.empresa_id)
-  console.log("🕒 DATA:", payload.new.data)
-
+},()=>{
   load(t.inicio,t.fim)
-
 })
-.subscribe((status)=>{
-  console.log("📡 STATUS REALTIME:", status)
-})
-
-
-
-
-  
+.subscribe()
 function lerJSONSeguro(raw){
 
   try{
