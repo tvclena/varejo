@@ -258,7 +258,7 @@ if(!raw) return null
   }
 
 return {
-  data: toBahia(dataHora),
+  data: dataHora,
   valor: Number(raw?.valor || 0),
   finais: raw?.finalizacoes || [],
   cancelado: raw?.cancelada || raw?.cancelado || false
@@ -286,15 +286,8 @@ const id = v.id || raw?.id
 const p = parse(v)
 if(!p || !p.data) return
 
-function toBahia(date){
-  return new Date(
-    new Date(date).toLocaleString("en-US",{ timeZone:"America/Bahia" })
-  )
-}
+    const d = new Date(p.data)
 
-const d = p.data
-
-    
 
 
     
@@ -400,13 +393,8 @@ async function load(inicio, fim){
   const step = 300
 
   // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
-function toDateOnly(date){
-  return date.toISOString().slice(0,10)
-}
-
-const inicioISO = toDateOnly(inicio)
-const fimISO = toDateOnly(fim)
-  
+  const inicioISO = inicio.toISOString()
+  const fimISO = fim.toISOString()
 
   while(true){
 
