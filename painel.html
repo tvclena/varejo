@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -276,8 +277,7 @@ const raw = lerJSONSeguro(v.raw)
 
 if(!raw) return null
 
-const id = v.id || raw?.id
-    // 🔥 BLOQUEIO DE DUPLICADOS
+const id = v.venda_id || raw?.id || raw?.idExterno || Math.random()    // 🔥 BLOQUEIO DE DUPLICADOS
     if(!id) return
     if(seen.has(id)) return
     seen.add(id)
@@ -509,16 +509,96 @@ document.getElementById("fim").value = formatLocal(t.fim)
 
 load(t.inicio,t.fim)
 
-// ================= REALTIME =================
-sb.channel("rt")
-.on("postgres_changes",{
-  event:"INSERT",
-  schema:"public",
-  table:"cupons_importados"
-},()=>{
-  load(t.inicio,t.fim)
+// ================= TEMPO REAL VIA API =================
+
+async function buscarTempoReal(){
+
+  const hoje = new Date()
+
+  function toDateOnly(date){
+    return date.getFullYear() + "-" +
+      String(date.getMonth()+1).padStart(2,"0") + "-" +
+      String(date.getDate()).padStart(2,"0")
+  }
+
+  const empresas = [
+    "VAREJO_URL_MERCATTO",
+    "VAREJO_URL_VILLA",
+    "VAREJO_URL_PADARIA",
+    "VAREJO_URL_DELICIA"
+  ]
+
+  let all = []
+
+  for(const emp of empresas){
+
+    try{
+
+// 🔥 PEGA TOKEN AUTOMATICAMENTE
+const login = await fetch("/api/login",{
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({ empresa: emp })
 })
-.subscribe()
+
+const loginJson = await login.json()
+const token = loginJson.accessToken || loginJson.token
+
+// 🔥 AGORA SIM FUNCIONA
+const resp = await fetch("/api/recebimentos",{
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({
+    token, // 🔥 ESSA LINHA RESOLVE
+    empresa: emp,
+    dataInicio: toDateOnly(hoje),
+    dataFim: toDateOnly(hoje)
+  })
+})
+
+
+
+
+
+      
+
+      const json = await resp.json()
+
+      const items = (json.items || []).map(v=>({
+        raw: v,
+        empresa_id: emp
+      }))
+
+      all = all.concat(items)
+
+    }catch(e){
+      console.log("❌ ERRO TEMPO REAL:", emp, e.message)
+    }
+  }
+
+  return all
+}
+
+
+
+  setInterval(async ()=>{
+
+  console.log("🔄 TEMPO REAL...")
+
+  const novos = await buscarTempoReal()
+
+  const dados = process(novos, t.inicio, t.fim)
+
+  render(dados)
+
+}, 5000) // 5 segundos
+
+
+
+
+
+
+  
 function lerJSONSeguro(raw){
 
   try{
