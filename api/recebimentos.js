@@ -67,8 +67,8 @@ export default async function handler(req, res) {
     // ================= LOOP PAGINAÇÃO =================
     while (true) {
 
-const url = `${baseURL}?pagina=${pagina}&count=${count}&q=dataVenda=ge=${dataInicio};dataVenda=le=${dataFim}`
-      console.log(`\n📡 Página ${pagina}`)
+const url = `${baseURL}?pagina=${pagina}&count=${count}&q=dataHoraFechamentoCupom=ge=${dataInicio}T00:00:00;dataHoraFechamentoCupom=le=${dataFim}T23:59:59`
+  console.log(`\n📡 Página ${pagina}`)
       console.log(`➡️ Start: ${start}`)
       console.log(`➡️ URL: ${url}`)
 
