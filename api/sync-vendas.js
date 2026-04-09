@@ -70,20 +70,49 @@ export default async function handler(req, res){
         console.log("✅ TOKEN OK")
 
         // ================= RECEBIMENTOS =================
-        const resp = await fetch("https://varejo-six.vercel.app/api/recebimentos",{
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({
-            token,
-            empresa: emp.id,
-            dataInicio,
-            dataFim
-          })
-        })
+let pagina = 0
+const limite = 500
+let todosCupons = []
+
+while(true){
+
+  console.log("📄 BUSCANDO PAGINA:", pagina)
+
+  const resp = await fetch("https://varejo-six.vercel.app/api/recebimentos",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      token,
+      empresa: emp.id,
+      dataInicio,
+      dataFim,
+      pagina,   // 🔥 IMPORTANTE
+      limite    // 🔥 IMPORTANTE
+    })
+  })
+
+  const json = await resp.json()
+  const items = json.items || []
+
+  console.log(`📦 PAGINA ${pagina}:`, items.length)
+
+  if(items.length === 0){
+    console.log("🏁 FIM DA PAGINAÇÃO")
+    break
+  }
+
+  todosCupons = todosCupons.concat(items)
+
+  if(items.length < limite){
+    console.log("🏁 ÚLTIMA PAGINA")
+    break
+  }
+
+  pagina++
+}
 
         const json = await resp.json()
-        const cupons = json.items || []
-
+const cupons = todosCupons
         console.log("📊 TOTAL RECEBIDO:", cupons.length)
 
         if(!cupons.length){
