@@ -594,21 +594,6 @@ const resp = await fetch("/api/recebimentos",{
 
 
 
-  setInterval(async ()=>{
-
-  console.log("🔄 TEMPO REAL...")
-
-  const novos = await buscarTempoReal()
-
-  const dados = process(novos, t.inicio, t.fim)
-
-  render(dados)
-
-}, 5000) // 5 segundos
-
-
-
-
 
 
   
