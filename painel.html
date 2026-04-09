@@ -565,13 +565,20 @@ async function buscarTempoReal(){
       String(date.getDate()).padStart(2,"0")
   }
 
-  const empresas = [
-    "VAREJO_URL_MERCATTO",
-    "VAREJO_URL_VILLA",
-    "VAREJO_URL_PADARIA",
-    "VAREJO_URL_DELICIA"
-  ]
+const EMPRESAS = [
+  "VAREJO_URL_MERCATTO",
+  "VAREJO_URL_VILLA",
+  "VAREJO_URL_PADARIA",
+  "VAREJO_URL_DELICIA"
+]
 
+EMPRESAS.forEach(emp=>{
+  STATUS_EMPRESAS[emp] = "yellow"
+})
+
+
+
+  
   let all = []
 
   for(const emp of empresas){
@@ -641,24 +648,35 @@ async function buscarTempoReal(){
 }
 
 
-
 setInterval(async ()=>{
 
-  const novos = await buscarTempoReal()
+  console.log("🔄 INICIANDO LOOP TEMPO REAL")
 
-  const dados = process(novos, t.inicio, t.fim)
+  try{
 
-  // mistura com antigos (não perde nada)
-  Object.keys(ULTIMOS_DADOS).forEach(emp=>{
-    if(!dados[emp]){
-      dados[emp] = ULTIMOS_DADOS[emp]
-    }
-  })
+    const novos = await buscarTempoReal()
 
-  render(dados)
+    console.log("📦 DADOS BRUTOS:", novos)
+
+    const dados = process(novos, t.inicio, t.fim)
+
+    console.log("⚙️ PROCESSADO:", dados)
+
+    Object.keys(ULTIMOS_DADOS).forEach(emp=>{
+      if(!dados[emp]){
+        dados[emp] = ULTIMOS_DADOS[emp]
+      }
+    })
+
+    render(dados)
+
+    console.log("✅ RENDER OK")
+
+  }catch(e){
+    console.log("❌ ERRO LOOP:", e)
+  }
 
 }, 5000)
-
 
 
 
