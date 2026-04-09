@@ -402,12 +402,11 @@ async function importarTudo(){
       const resp = await fetch("/api/importar-cupons",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          empresa: emp.id,
-          empresa_nome: emp.nome,
-          dataInicio,
-          dataFim
-        })
+body: JSON.stringify({
+  empresa: emp.id,
+  dataInicio,
+  dataFim
+})
       });
 
       const json = await resp.json();
