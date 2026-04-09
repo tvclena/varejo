@@ -61,8 +61,7 @@ export default async function handler(req, res) {
     // ================= LOOP PAGINAÇÃO =================
     while (true) {
 
-      const url = `${baseURL}?start=${start}&count=${count}&q=dataVenda=ge=${dataInicio};dataVenda=le=${dataFim}`
-
+const url = `${baseURL}?pagina=${pagina}&count=${count}&q=dataVenda=ge=${dataInicio};dataVenda=le=${dataFim}`
       console.log(`\n📡 Página ${pagina}`)
       console.log(`➡️ Start: ${start}`)
       console.log(`➡️ URL: ${url}`)
@@ -117,8 +116,7 @@ export default async function handler(req, res) {
       }
 
       // 🔥 Próxima página
-      start += count
-      pagina++
+  pagina++
 
       // 🛑 Proteção contra loop infinito
       if (pagina > 1000) {
