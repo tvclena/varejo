@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/sync-vendas",
-      "schedule": "*/6 * * * *"
+      "schedule": "*/1 * * * *"
     }
   ]
 }
