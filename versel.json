@@ -1,13 +1,8 @@
 {
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "crons": [
     {
       "path": "/api/sync-vendas",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/6 * * * *"
     }
   ]
 }
