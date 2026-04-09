@@ -1,92 +1,94 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE
-)
-
 export default async function handler(req, res){
+
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  console.log("🚀 IMPORTAÇÃO COMPLETA")
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
   try{
 
-    const { empresa, empresa_nome, dataInicio, dataFim } = req.body
+    const { empresa, dataInicio, dataFim } = req.body
 
-    if(!empresa){
-      return res.json({ ok:false, error:"Empresa não enviada" })
-    }
-
-    const hoje = new Date().toISOString().slice(0,10)
-
-    const inicio = dataInicio || hoje
-    const fim = dataFim || hoje
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE
+    )
 
     // ================= LOGIN =================
-    const loginResp = await fetch(process.env.API_URL + "/login",{
+    const loginResp = await fetch("https://varejo-six.vercel.app/api/login",{
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({ empresa })
     })
 
     const loginData = await loginResp.json()
-
     const token = loginData.accessToken || loginData.token
 
     if(!token){
-      return res.json({ ok:false, error:"Token não retornado" })
+      return res.status(400).json({ error:"Sem token" })
     }
 
-    // ================= BUSCAR CUPONS =================
-    const resp = await fetch(process.env.API_URL + "/recebimentos",{
+    console.log("✅ TOKEN OK")
+
+    // ================= RECEBIMENTOS =================
+    const resp = await fetch("https://varejo-six.vercel.app/api/recebimentos",{
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
         token,
         empresa,
-        dataInicio: inicio,
-        dataFim: fim
+        dataInicio,
+        dataFim
       })
     })
 
     const json = await resp.json()
-
     const cupons = json.items || []
 
-    if(cupons.length === 0){
-      return res.json({ ok:true, inseridos:0, msg:"Sem cupons" })
+    console.log("📦 TOTAL API:", cupons.length)
+
+    if(!cupons.length){
+      return res.json({ ok:true, total:0 })
     }
 
-    // ================= PREPARAR INSERT =================
-    const inserts = []
-    const pagamentos = []
+    // ================= VERIFICAR EXISTENTES =================
+    const ids = cupons.map(c => empresa + "_" + (c.id || c.vendaId))
 
-    for(const cupom of cupons){
+    const { data: existentes } = await supabase
+      .from("cupons_importados")
+      .select("unique_id")
+      .in("unique_id", ids)
 
-      const unique_id = empresa + "_" + cupom.id
+    const setExistentes = new Set((existentes || []).map(e=>e.unique_id))
 
-      // 🔹 cálculo base
-      const valor_total = Number(cupom.valorTotal || 0)
-      const cancelado = !!cupom.cancelada
+    let novos = []
+    let pagamentos = []
 
-      // 🔹 finalizadora principal
-      const finalizadora_principal =
-        cupom.finalizacoes?.[0]?.descricao || null
+    for(const c of cupons){
 
-      inserts.push({
+      const venda_id = c.id || c.vendaId
+      if(!venda_id) continue
+
+      const unique_id = empresa + "_" + venda_id
+
+      if(setExistentes.has(unique_id)) continue
+
+      const valor_total = Number(c.valorTotal || 0)
+
+      novos.push({
         unique_id,
-        empresa: empresa_nome,
         empresa_id: empresa,
-        venda_id: cupom.id,
-        data: cupom.data,
+        venda_id,
+        data: c.dataVenda,
         valor_total,
-        valor_liquido: valor_total,
-        finalizadora_principal,
-        cancelado,
-        raw: cupom
+        cancelado: !!c.cancelada,
+        raw: c
       })
 
-      // 🔹 pagamentos separados
-      if(Array.isArray(cupom.finalizacoes)){
-        cupom.finalizacoes.forEach(f => {
+      // 💳 PAGAMENTOS
+      if(Array.isArray(c.finalizacoes)){
+        c.finalizacoes.forEach(f=>{
           pagamentos.push({
             cupom_unique_id: unique_id,
             finalizadora_id: String(f.finalizadoraId),
@@ -95,21 +97,23 @@ export default async function handler(req, res){
           })
         })
       }
-
     }
 
-    // ================= INSERT CUPONS =================
-    const { error: erroInsert } = await supabase
-      .from("cupons_importados")
-      .upsert(inserts, { onConflict:"unique_id" })
+    console.log("🆕 NOVOS:", novos.length)
 
-    if(erroInsert){
-      return res.json({ ok:false, error: erroInsert.message })
+    // ================= INSERT CUPONS =================
+    if(novos.length){
+      const { error } = await supabase
+        .from("cupons_importados")
+        .insert(novos)
+
+      if(error){
+        console.log("❌ ERRO CUPONS:", error.message)
+      }
     }
 
     // ================= INSERT PAGAMENTOS =================
-    if(pagamentos.length > 0){
-
+    if(pagamentos.length){
       await supabase
         .from("cupons_pagamentos")
         .insert(pagamentos)
@@ -117,17 +121,17 @@ export default async function handler(req, res){
 
     return res.json({
       ok:true,
-      inseridos: inserts.length,
+      total: cupons.length,
+      novos: novos.length,
       pagamentos: pagamentos.length
     })
 
   }catch(e){
 
-    return res.json({
-      ok:false,
-      error: e.message
+    console.log("💥 ERRO:", e.message)
+
+    return res.status(500).json({
+      error:e.message
     })
-
   }
-
 }
