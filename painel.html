@@ -534,37 +534,57 @@ async function buscarTempoReal(){
 
     try{
 
-// 🔥 PEGA TOKEN AUTOMATICAMENTE
-const login = await fetch("/api/login",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({ empresa: emp })
-})
+      console.log("━━━━━━━━━━━━━━━━━━━━━━")
+      console.log("🏢 EMPRESA:", emp)
 
-const loginJson = await login.json()
-const token = loginJson.accessToken || loginJson.token
+      // 🔐 LOGIN
+      console.log("🔐 LOGIN INICIO")
 
-// 🔥 AGORA SIM FUNCIONA
-const resp = await fetch("/api/recebimentos",{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body: JSON.stringify({
-    token, // 🔥 ESSA LINHA RESOLVE
-    empresa: emp,
-    dataInicio: toDateOnly(hoje),
-    dataFim: toDateOnly(hoje)
-  })
-})
+      const login = await fetch("/api/login",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ empresa: emp })
+      })
 
+      console.log("🔐 STATUS LOGIN:", login.status)
 
+      const loginJson = await login.json()
+      console.log("🔐 LOGIN RESPONSE:", loginJson)
 
+      const token = loginJson.accessToken || loginJson.token
 
+      if(!token){
+        console.log("❌ TOKEN NÃO VEIO")
+        continue
+      }
 
-      
+      // 🌐 API
+      console.log("🌐 BUSCANDO VENDAS")
+
+      const resp = await fetch("/api/recebimentos",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          token,
+          empresa: emp,
+          dataInicio: toDateOnly(hoje),
+          dataFim: toDateOnly(hoje)
+        })
+      })
+
+      console.log("🌐 STATUS API:", resp.status)
 
       const json = await resp.json()
+      console.log("📥 RESPONSE:", json)
 
-      const items = (json.items || []).map(v=>({
+      if(!json.items || json.items.length === 0){
+        console.log("⚠️ SEM DADOS:", emp)
+        continue
+      }
+
+      console.log("📦 ITEMS:", json.items.length)
+
+      const items = json.items.map(v=>({
         raw: v,
         empresa_id: emp
       }))
@@ -572,9 +592,24 @@ const resp = await fetch("/api/recebimentos",{
       all = all.concat(items)
 
     }catch(e){
-      console.log("❌ ERRO TEMPO REAL:", emp, e.message)
+
+      console.log("❌ ERRO TEMPO REAL:", emp)
+      console.log("❌ DETALHE:", e)
+
+      // 🔥 ENVIA PARA VERCEL
+      fetch("/api/log",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          tipo:"erro",
+          empresa: emp,
+          erro: e.message
+        })
+      })
     }
   }
+
+  console.log("📊 TOTAL TEMPO REAL:", all.length)
 
   return all
 }
