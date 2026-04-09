@@ -540,11 +540,14 @@ async function buscarTempoReal(){
       // 🔐 LOGIN
       console.log("🔐 LOGIN INICIO")
 
-      const login = await fetch("/api/login",{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ empresa: emp })
-      })
+const login = await fetch("/api/login",{
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({ empresa: emp })
+}).catch(e=>{
+  console.log("❌ FETCH LOGIN QUEBROU:", e)
+  throw e
+})
 
       console.log("🔐 STATUS LOGIN:", login.status)
 
