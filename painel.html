@@ -393,8 +393,13 @@ async function load(inicio, fim){
   const step = 300
 
   // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
-  const inicioISO = inicio.toISOString()
-  const fimISO = fim.toISOString()
+function toLocalISO(date){
+  const tzOffset = date.getTimezoneOffset() * 60000
+  return new Date(date - tzOffset).toISOString().slice(0,19)
+}
+
+const inicioISO = toLocalISO(inicio)
+const fimISO = toLocalISO(fim)
 
   while(true){
 
@@ -402,7 +407,7 @@ async function load(inicio, fim){
       .from("cupons_importados")
       .select("empresa_id,data,raw") // 🔥 NÃO USA *
       .gte("data", inicioISO)        // 🔥 FILTRO NO BANCO
-      .lte("data", fimISO)
+      .lt("data", new Date(fim.getTime() + 1000).toISOString())
       .range(from, from + step - 1)
 
     if(error){
