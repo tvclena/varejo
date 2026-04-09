@@ -507,10 +507,25 @@ sb.channel("rt")
   event:"INSERT",
   schema:"public",
   table:"cupons_importados"
-},()=>{
+},(payload)=>{
+
+  console.log("━━━━━━━━━━━━━━━━━━━━━━")
+  console.log("⚡ NOVO CUPOM INSERIDO")
+  console.log("📦 DADOS:", payload.new)
+  console.log("🏢 EMPRESA:", payload.new.empresa_id)
+  console.log("🕒 DATA:", payload.new.data)
+
   load(t.inicio,t.fim)
+
 })
-.subscribe()
+.subscribe((status)=>{
+  console.log("📡 STATUS REALTIME:", status)
+})
+
+
+
+
+  
 function lerJSONSeguro(raw){
 
   try{
