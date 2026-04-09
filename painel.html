@@ -393,8 +393,13 @@ async function load(inicio, fim){
   const step = 300
 
   // 🔥 CONVERTE DATA UMA VEZ (evita custo repetido)
-  const inicioISO = inicio.toISOString()
-  const fimISO = fim.toISOString()
+function toDateOnly(date){
+  return date.toISOString().slice(0,10)
+}
+
+const inicioISO = toDateOnly(inicio)
+const fimISO = toDateOnly(fim)
+  
 
   while(true){
 
