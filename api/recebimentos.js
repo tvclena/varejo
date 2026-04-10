@@ -13,12 +13,6 @@ export default async function handler(req, res) {
 
   try {
 
-
-
-
-
-
-    
     const { token, dataInicio, dataFim, empresa } = req.body
 
     console.log("📥 BODY:", req.body)
@@ -103,26 +97,53 @@ const url = `${baseURL}?pagina=${pagina}&count=${count}&q=dataHoraFechamentoCupo
 
       console.log(`📦 Itens recebidos: ${items.length}`)
 
-      // 🔴 Se não veio nada → acabou
-      if (items.length === 0) {
-        console.log("📭 Fim da paginação")
-        break
-      }
+// 🔥 CONTROLE DE DUPLICIDADE
+if (!global.ids) global.ids = new Set()
+if (!global.ultimaQtd) global.ultimaQtd = 0
 
-      // 🔥 ACUMULA
-      allItems.push(...items)
-      totalGeral += items.length
+let novos = 0
 
-      console.log(`📊 Total acumulado: ${totalGeral}`)
+for (const item of items) {
+  if (!global.ids.has(item.id)) {
+    global.ids.add(item.id)
+    allItems.push(item)
+    novos++
+  }
+}
 
-      // 🔴 Se veio menos que 500 → acabou
-      if (items.length < count) {
-        console.log("✅ Última página detectada")
-        break
-      }
+totalGeral = allItems.length
 
-      // 🔥 Próxima página
-  pagina++
+console.log(`🆕 Novos adicionados: ${novos}`)
+console.log(`📊 Total acumulado real: ${totalGeral}`)
+
+// 🔴 Se não veio nada → acabou
+if (items.length === 0) {
+  console.log("📭 Fim da paginação")
+  break
+}
+
+// 🔴 SE NÃO TROUXE NADA NOVO → PARA (CORREÇÃO PRINCIPAL)
+if (novos === 0) {
+  console.log("🛑 DUPLICAÇÃO DETECTADA → PARANDO")
+  break
+}
+
+// 🔴 SE PAROU DE CRESCER → PARA
+if (allItems.length === global.ultimaQtd) {
+  console.log("🛑 SEM CRESCIMENTO → PARANDO")
+  break
+}
+
+global.ultimaQtd = allItems.length
+
+// 🔥 Próxima página
+pagina++
+
+// 🛑 Segurança
+if (pagina > 1000) {
+  console.log("⛔ LOOP BLOQUEADO")
+  break
+}
 
       // 🛑 Proteção contra loop infinito
       if (pagina > 1000) {
