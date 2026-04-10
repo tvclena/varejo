@@ -1,17 +1,26 @@
 import { createClient } from "@supabase/supabase-js"
 
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+)
+
+let rodando = false
+
 export default async function handler(req, res){
+  const origem = req.headers["x-source"] || "cron"
 
-  const startGlobal = Date.now()
+  console.log("📡 Origem da execução:", origem)
+  const startGlobal = Date.now() // 🔥 AQUI EXATO
 
-  console.log("🚀 SYNC GLOBAL CUPONS START")
-
+// ativa lock
+await supabase
+  .from("controle_sync")
+  .update({ rodando:true, atualizado_em:new Date() })
+  .eq("id",1)
+  
   try{
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE
-    )
     const empresas = [
       { id:"VAREJO_URL_DELICIA", nome:"DELÍCIA" },
       { id:"VAREJO_URL_VILLA", nome:"VILLA" },
@@ -19,39 +28,50 @@ export default async function handler(req, res){
       { id:"VAREJO_URL_MERCATTO", nome:"MERCATTO" }
     ]
 
-    let totalNovos = 0
-    let totalExistentes = 0
+    function dataBahia(offset = 0){
+      const d = new Date(
+        new Date().toLocaleString("en-US", { timeZone:"America/Bahia" })
+      )
+      d.setDate(d.getDate() + offset)
+      return d.toISOString().slice(0,10)
+    }
+
+    const agora = new Date(
+      new Date().toLocaleString("en-US",{ timeZone:"America/Bahia" })
+    )
+
+    const inicio = agora.getHours() < 2 ? dataBahia(-1) : dataBahia(0)
+    const fim = dataBahia(0)
+
+    console.log("📅 PERÍODO:", inicio, "→", fim)
+
+    let totalInseridos = 0
     let totalPagamentos = 0
     let totalErros = 0
 
     for(const emp of empresas){
 
-      const startEmpresa = Date.now()
 
+const agora = new Date(
+  new Date().toLocaleString("en-US",{ timeZone:"America/Bahia" })
+)
+
+const hora = agora.getHours()
+
+// 🔥 REGRA PADARIA (RODA SÓ ATÉ 22H)
+if(emp.id === "VAREJO_URL_PADARIA" && hora >= 22){
+  console.log("🌙 PADARIA ignorada após 22h")
+  continue
+}
+
+
+
+
+      
       console.log("━━━━━━━━━━━━━━━━━━━━━━━")
       console.log("🏢 EMPRESA:", emp.nome)
 
       try{
-
-        // ================= PEGAR ÚLTIMA DATA =================
-        const { data: ultima } = await supabase
-          .from("cupons_importados")
-          .select("data")
-          .eq("empresa_id", emp.id)
-          .order("data", { ascending:false })
-          .limit(1)
-
-        const ultimaData = ultima?.[0]?.data
-
-        const dataInicio = ultimaData
-          ? new Date(new Date(ultimaData).getTime() - 86400000).toISOString().slice(0,10)
-          : new Date(Date.now() - 86400000 * 3).toISOString().slice(0,10)
-
-        const dataFim = new Date().toISOString().slice(0,10)
-
-        console.log("📅 PERIODO:", dataInicio, "→", dataFim)
-
-        // ================= LOGIN =================
         const loginResp = await fetch("https://varejo-six.vercel.app/api/login",{
           method:"POST",
           headers:{ "Content-Type":"application/json" },
@@ -69,129 +89,189 @@ export default async function handler(req, res){
 
         console.log("✅ TOKEN OK")
 
-        // ================= RECEBIMENTOS =================
-        const resp = await fetch("https://varejo-six.vercel.app/api/recebimentos",{
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({
-            token,
-            empresa: emp.id,
-            dataInicio,
-            dataFim
-          })
-        })
+const count = emp.id === "VAREJO_URL_PADARIA" ? 200 : 500
 
-        const json = await resp.json()
-        const cupons = json.items || []
+let pagina = 1
+const idsProcessados = new Set()
+let totalProcessados = 0
 
-        console.log("📊 TOTAL RECEBIDO:", cupons.length)
-
-        if(!cupons.length){
-          console.log("⚠️ NADA NOVO")
-          continue
-        }
-
-        // ================= EXISTENTES =================
-        const uniqueIds = cupons.map(c => emp.id + "_" + (c.id || c.vendaId))
-
-        const { data: existentes } = await supabase
-          .from("cupons_importados")
-          .select("unique_id")
-          .in("unique_id", uniqueIds)
-
-        const existentesSet = new Set((existentes || []).map(e => e.unique_id))
-
-        console.log("♻️ JÁ EXISTIAM:", existentesSet.size)
-
-        const novos = []
-        const pagamentos = []
-
-        for(const cupom of cupons){
-
-          const venda_id = cupom.id || cupom.vendaId
-          if(!venda_id) continue
-
-          const unique_id = emp.id + "_" + venda_id
-
-          if(existentesSet.has(unique_id)){
-            totalExistentes++
-            continue
-          }
-
-          const valor_total = Number(cupom.valorTotal || 0)
-
-          novos.push({
-            unique_id,
-            empresa: emp.nome,
-            empresa_id: emp.id,
-            venda_id,
-            data: cupom.data,
-            valor_total,
-            valor_liquido: valor_total,
-            finalizadora_principal: cupom.finalizacoes?.[0]?.descricao || null,
-            cancelado: !!cupom.cancelada,
-            raw: cupom
+while(true){
+          const resp = await fetch("https://varejo-six.vercel.app/api/recebimentos",{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+body: JSON.stringify({
+  token,
+  empresa: emp.id,
+  dataInicio: inicio,
+  dataFim: fim,
+  pagina
+})
           })
 
-          if(Array.isArray(cupom.finalizacoes)){
-            cupom.finalizacoes.forEach(f=>{
-              pagamentos.push({
-                cupom_unique_id: unique_id,
-                finalizadora_id: String(f.finalizadoraId),
-                finalizadora_nome: f.descricao,
-                valor: Number(f.valor || 0)
-              })
-            })
+if(!resp.ok){
+  console.log("❌ ERRO API:", resp.status)
+  break
+}
+
+const json = await resp.json()
+  
+  const items = json.items || []
+
+console.log(`📡 Página ${pagina} | itens=${items.length}`)
+          if(!items.length){
+            console.log("📭 Fim da API")
+            break
           }
 
+          const inserts = []
+          const pagamentos = []
+
+         let novos = 0
+
+for(const v of items){
+
+  const venda_id = v.id
+  if(!venda_id) continue
+
+  const unique_id = `${emp.id}_${venda_id}`
+
+  // 🔥 CONTROLE DE DUPLICAÇÃO
+  if(idsProcessados.has(unique_id)){
+    continue
+  }
+
+  idsProcessados.add(unique_id)
+  novos++
+  totalProcessados++
+
+  const valor = Number(v.valor || 0)
+  const desconto = Number(v.desconto || 0)
+  const acrescimo = Number(v.acrescimo || 0)
+
+  const valor_total = valor + acrescimo
+  const valor_liquido = valor - desconto
+
+  const cancelado = (v.qtdItensCancelados || 0) > 0
+
+  inserts.push({
+    unique_id,
+    empresa: emp.nome,
+    empresa_id: emp.id,
+    venda_id,
+    data: v.dataVenda,
+    valor,
+    valor_total,
+    valor_liquido,
+    finalizadora_principal: v.finalizacoes?.[0]?.descricao || null,
+    cancelado,
+    raw: v
+  })
+
+  if(Array.isArray(v.finalizacoes)){
+    v.finalizacoes.forEach(f=>{
+      pagamentos.push({
+        cupom_unique_id: unique_id,
+        finalizadora_id: String(f.finalizadoraId),
+        finalizadora_nome: f.descricao,
+        valor: Number(f.valor || 0)
+      })
+    })
+  }
+}
+
+if(inserts.length){
+
+  const { error } = await supabase
+    .from("cupons_importados")
+    .upsert(inserts, { onConflict:"unique_id" })
+
+  if(error){
+    totalErros++
+  }else{
+    totalInseridos += inserts.length
+  }
+}
+
+// 🔥 FORA DO IF
+if(pagamentos.length){
+  await supabase
+    .from("cupons_pagamentos")
+    .upsert(pagamentos, { onConflict:"cupom_unique_id,finalizadora_id" })
+}
+
+          // 🔥 SE VEIO MENOS QUE 500 → ACABOU
+console.log("🆕 Novos:", novos)
+console.log("📊 Total processado:", totalProcessados)
+
+// 🔥 PARADA REAL (ESSENCIAL)
+if(novos === 0){
+  console.log("🛑 Nenhum novo → FINALIZANDO")
+  break
+}
+
+// 🔥 FIM REAL
+if(items.length < count){
+  console.log("🏁 Última página")
+  break
+}
+
+          pagina++
+// 🔥 evita travar API
+await new Promise(r => setTimeout(r, 500))
+          // 🔥 LIMITE DE SEGURANÇA
+// 🔥 LIMITE PADARIA
+if(pagina > 50){
+  console.log("⚠️ Limite de segurança atingido")
+  break
+}
         }
-
-        console.log("🆕 NOVOS:", novos.length)
-
-        if(novos.length){
-
-          const { error } = await supabase
-            .from("cupons_importados")
-            .insert(novos)
-
-          if(error){
-            console.log("❌ ERRO INSERT:", error.message)
-            totalErros++
-            continue
-          }
-
-          console.log("✅ INSERIDOS:", novos.length)
-          totalNovos += novos.length
-        }
-
-        if(pagamentos.length){
-          await supabase.from("cupons_pagamentos").insert(pagamentos)
-          totalPagamentos += pagamentos.length
-        }
-
-        console.log("⏱️ TEMPO:", ((Date.now()-startEmpresa)/1000).toFixed(2)+"s")
 
       }catch(e){
         console.log("💥 ERRO:", emp.nome, e.message)
         totalErros++
       }
-
     }
 
+    const tempo = ((Date.now() - startGlobal)/1000).toFixed(2)
+
     console.log("━━━━━━━━━━━━━━━━━━━━━━━")
-    console.log("🔥 RESUMO FINAL")
-    console.log("🆕 NOVOS:", totalNovos)
-    console.log("♻️ IGNORADOS:", totalExistentes)
-    console.log("💳 PAGAMENTOS:", totalPagamentos)
-    console.log("❌ ERROS:", totalErros)
+    console.log("🔥 FINALIZADO")
+    console.log("🆕 Inseridos:", totalInseridos)
+    console.log("💳 Pagamentos:", totalPagamentos)
+    console.log("❌ Erros:", totalErros)
+    console.log("⏱ Tempo:", tempo,"s")
+await supabase
+  .from("controle_sync")
+  .update({ rodando:false, atualizado_em:new Date() })
+  .eq("id",1)
+    rodando = false
 
     return res.json({
       ok:true,
-      novos: totalNovos,
-      existentes: totalExistentes
+      inseridos: totalInseridos,
+      pagamentos: totalPagamentos,
+      erros: totalErros,
+      tempo
     })
 
   }catch(e){
-    return res.status(500).json({ error:e.message })
+
+    rodando = false
+
+    console.log("❌ ERRO GLOBAL:", e)
+
+
+
+await supabase
+  .from("controle_sync")
+  .update({ rodando:false, atualizado_em:new Date() })
+  .eq("id",1)
+
+    
+
+    return res.status(500).json({
+      ok:false,
+      error:e.message
+    })
   }
 }
