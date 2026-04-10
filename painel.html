@@ -8,7 +8,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-
+  
+  
+  
+  
 <style>
 body{
   margin:0;
@@ -286,10 +289,10 @@ const id = raw?.id
 const p = parse(v)
 if(!p || !p.data) return
 
-    const d = new Date(p.data)
-    d.setHours(d.getHours() - 3)
+const d = new Date(p.data)
 
-    if(d < inicio || d > fim) return
+// NÃO mexe no horário aqui
+if(d < inicio || d > fim) return
 
     const emp = v.empresa_id
 
@@ -311,19 +314,23 @@ if(!p || !p.data) return
     }
 
     // ✅ VÁLIDOS
-    let totalCupom = 0
+const totalCupom = p.valor
 
-    p.finais.forEach(f=>{
-const valor = (Number(f.valor || 0) - Number(f.troco || 0))
-totalCupom += valor
+p.finais.forEach(f=>{
+const valorBruto = Number(f.valor || 0)
+const troco = Number(f.troco || 0)
 
-      const idf = Number(f.finalizadoraId)
-      const nome = MAPA[emp]?.[idf] || "OUTROS"
+// 🔥 REMOVE TROCO
+const valor = valorBruto - troco
+  
+  const idf = Number(f.finalizadoraId)
+  const nome = MAPA[emp]?.[idf] || "OUTROS"
 
-      result[emp].finais[nome] =
-        (result[emp].finais[nome] || 0) + valor
-    })
+  result[emp].finais[nome] =
+    (result[emp].finais[nome] || 0) + valor
+})
 
+    
     result[emp].total += totalCupom
     result[emp].vendas++
 
@@ -496,6 +503,5 @@ function lerJSONSeguro(raw){
   }
 }
 </script>
-
 </body>
 </html>
