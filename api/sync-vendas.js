@@ -5,6 +5,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE
 )
 
+
+
 export default async function handler(req, res){
   const origem = req.headers["x-source"] || "cron"
 
