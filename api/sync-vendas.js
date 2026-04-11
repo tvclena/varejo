@@ -11,7 +11,7 @@ export default async function handler(req, res){
   const origem = req.headers["x-source"] || "cron"
 
   console.log("📡 Origem da execução:", origem)
-  const startGlobal = Date.now() // 🔥 AQUI EXATO
+  const startGlobal = Date.now() 
 
 const { data: lock } = await supabase
   .from("controle_sync")
